@@ -1,47 +1,56 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 import './layout.css';
 
 export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="layout-shell">
-      <Sidebar />
+      <Sidebar
+        id="sidebar-nav"
+        onNavigate={() => setSidebarOpen(false)}
+      />
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="layout-sidebar-overlay"
+          aria-hidden="true"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile sidebar drawer */}
+      <div
+        className={`layout-sidebar-mobile${sidebarOpen ? ' is-open' : ''}`}
+        aria-hidden={!sidebarOpen}
+      >
+        <Sidebar
+          id="sidebar-mobile-nav"
+          onNavigate={() => setSidebarOpen(false)}
+        />
+      </div>
 
       <div className="layout-main">
-        {/* Mobile top bar */}
-        <header className="layout-topbar">
-          <button
-            type="button"
-            aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen((prev) => !prev)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-text)',
-              cursor: 'pointer',
-              padding: 'var(--space-2)',
-              marginRight: 'var(--space-3)',
-            }}
-          >
-            ☰
-          </button>
-          <span
-            style={{
-              fontSize: 'var(--text-lg)',
-              fontWeight: 700,
-              letterSpacing: '-0.03em',
-            }}
-          >
-            Nite<span style={{ color: 'var(--color-accent)' }}>Owl</span>
-          </span>
-        </header>
+        <TopBar
+          onMenuToggle={() => setSidebarOpen((prev) => !prev)}
+          menuOpen={sidebarOpen}
+        />
 
         <main className="layout-content" id="main-content">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

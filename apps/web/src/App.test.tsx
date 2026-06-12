@@ -22,7 +22,7 @@ function renderApp(initialPath = '/login') {
 
 describe('App smoke tests', () => {
   beforeEach(() => {
-    localStorage.clear();
+    localStorage.removeItem('niteowl:auth');
   });
 
   it('renders the login page on /login', () => {

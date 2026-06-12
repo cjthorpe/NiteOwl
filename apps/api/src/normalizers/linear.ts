@@ -83,7 +83,7 @@ export function normalizeLinearEvent(
     eventType,
     sourceId: `issue:${data.id}:${action}`,
     title: `[${data.team.key}] ${data.identifier}: ${data.title}`,
-    description: data.description,
+    description: data.description ?? undefined,
     url: data.url,
     metadata: {
       identifier: data.identifier,
