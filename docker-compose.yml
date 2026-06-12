@@ -58,10 +58,20 @@ services:
         - action: sync
           path: ./packages/shared/src
           target: /app/packages/shared/src
+        - action: sync
+          path: ./packages/types/src
+          target: /app/packages/types/src
+        - action: sync
+          path: ./packages/db/src
+          target: /app/packages/db/src
         - action: rebuild
           path: apps/api/package.json
         - action: rebuild
           path: packages/shared/package.json
+        - action: rebuild
+          path: packages/types/package.json
+        - action: rebuild
+          path: packages/db/package.json
 
   web:
     build:

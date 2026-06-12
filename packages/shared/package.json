@@ -2,22 +2,25 @@
   "name": "@niteowl/shared",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@niteowl/types": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^1.5.0"
+    "typescript": "*",
+    "vitest": "^1.6.0"
   }
 }

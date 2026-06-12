@@ -27,7 +27,16 @@ export const providerEnum = pgEnum("provider", [
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull().default(""),
+  avatarUrl: text("avatar_url"),
+  /** bcrypt hash — null for OAuth-only accounts */
+  passwordHash: text("password_hash"),
+  /** GitHub numeric user ID — null until GitHub OAuth is connected */
+  githubId: text("github_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
@@ -147,3 +156,30 @@ export const webhookEvents = pgTable(
 
 export type WebhookEvent = typeof webhookEvents.$inferSelect;
 export type NewWebhookEvent = typeof webhookEvents.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// refresh_tokens
+// ---------------------------------------------------------------------------
+
+export const refreshTokens = pgTable(
+  "refresh_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** SHA-256 hex digest of the raw opaque token sent in the cookie */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("refresh_tokens_user_id_idx").on(table.userId),
+    index("refresh_tokens_token_hash_idx").on(table.tokenHash),
+  ],
+);
+
+export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type NewRefreshToken = typeof refreshTokens.$inferInsert;

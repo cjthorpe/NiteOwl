@@ -1,84 +1,116 @@
 # NiteOwl
 
-Monorepo for the NiteOwl application — React/TypeScript frontend, Node.js API backend, and shared utilities.
+Monorepo for the NiteOwl application — React/TypeScript frontend, Fastify API, Drizzle ORM, shared types.
 
-## Structure
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Frontend | React 18, TypeScript (strict), Vite |
+| API | Node.js 20 LTS, Fastify 4, TypeScript |
+| Database | PostgreSQL 16 via Drizzle ORM |
+| Cache / Queue | Redis 7, ioredis |
+| Package manager | pnpm workspaces + Turborepo |
+| Containers | Docker Compose v2 |
+| Deployment | Railway (see `railway.toml`) |
+
+## Monorepo layout
 
 ```
 niteowl/
 ├── apps/
-│   ├── api/          Node.js + Express API (port 3001)
-│   └── web/          React + Vite frontend (port 5173)
+│   ├── api/          # Fastify API           (port 3001)
+│   └── web/          # React / Vite SPA      (port 5173)
 ├── packages/
-│   └── shared/       Shared types and utilities
-└── docker-compose.yml
+│   ├── db/           # Drizzle ORM schema + migrations
+│   ├── shared/       # Runtime utility functions
+│   └── types/        # Shared domain TypeScript types
+├── .github/
+│   └── workflows/
+│       ├── ci.yml    # Lint, type-check, test, Docker build
+│       └── deploy.yml# Build + push to GHCR, deploy to Railway
+├── docker-compose.yml
+├── turbo.json
+├── .env.example
+└── tsconfig.base.json
 ```
 
 ## Prerequisites
 
-- [Node.js 20 LTS](https://nodejs.org)
-- [pnpm 9+](https://pnpm.io/installation) (`npm install -g pnpm`)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for Docker Compose)
+- [Docker Desktop](https://docs.docker.com/get-docker/) (includes Compose v2)
+- [Node.js 20 LTS](https://nodejs.org/)
+- [pnpm 9+](https://pnpm.io/installation): `corepack enable && corepack prepare pnpm@latest --activate`
 
-## Local Development
-
-### One-command Docker start
+## Local development (one command)
 
 ```bash
+# 1. Clone and enter the repo
+git clone <repo-url> && cd niteowl
+
+# 2. Copy environment config
 cp .env.example .env
-docker compose up
+
+# 3. Start everything (Postgres, Redis, API, Web — with hot-reload)
+docker compose watch
 ```
 
-This starts:
-- **postgres** on `localhost:5432`
-- **redis** on `localhost:6379`
-- **api** on `http://localhost:3001`
-- **web** on `http://localhost:5173`
+Services will be available at:
 
-Live reload is enabled via Docker Compose Watch (sync on source changes, rebuild on dependency changes).
+| Service | URL |
+|---------|-----|
+| Web | http://localhost:5173 |
+| API | http://localhost:3001 |
+| API health | http://localhost:3001/health |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
 
-### Native development (without Docker)
+`docker compose watch` uses the `develop.watch` directives in `docker-compose.yml` for hot-reload without volume mounts.
+
+## Running without Docker (optional)
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Copy environment
-cp .env.example .env
-
-# Start all apps in parallel
-pnpm dev
+pnpm build          # builds shared → types → db → api → web
+pnpm dev            # starts api + web in parallel via Turborepo
 ```
 
-You'll need Postgres and Redis running locally (or update `.env` to point to Docker instances).
+> You will need a local PostgreSQL and Redis instance, or set `DATABASE_URL` and `REDIS_URL` to Docker services started separately.
+
+## Database migrations
+
+```bash
+# Generate a new migration from schema changes
+pnpm --filter "@niteowl/db" db:generate
+
+# Apply pending migrations
+pnpm --filter "@niteowl/db" db:migrate
+
+# Open Drizzle Studio
+pnpm --filter "@niteowl/db" db:studio
+```
 
 ## Scripts
 
-From the repo root:
-
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Start all apps in dev mode |
-| `pnpm build` | Build all packages |
-| `pnpm lint` | ESLint across all packages |
-| `pnpm lint:fix` | ESLint with auto-fix |
-| `pnpm format` | Prettier format all files |
-| `pnpm format:check` | Prettier check (used in CI) |
-| `pnpm typecheck` | TypeScript type-check all packages |
-| `pnpm test` | Run all tests |
+| `pnpm dev` | Start all apps in watch mode (Turborepo) |
+| `pnpm build` | Build all packages in dependency order |
+| `pnpm lint` | Run ESLint across the repo |
+| `pnpm format` | Run Prettier |
+| `pnpm typecheck` | TypeScript check (no emit) |
+| `pnpm test` | Run all Vitest suites |
 
-## Environment Variables
+## Environment variables
 
-Copy `.env.example` to `.env` and adjust values for your environment. See `.env.example` for all variables and their documentation.
+See `.env.example` for all variables with inline descriptions. Copy to `.env` and fill in values. Never commit `.env`.
 
 ## CI
 
-GitHub Actions runs on every push/PR to `main`:
-1. Install dependencies (pnpm cache)
-2. Lint
-3. Format check
-4. Type-check
-5. Build `@niteowl/shared`
-6. Test all packages
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` / `develop` and on all pull requests:
 
-See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+1. **Lint & Format** — ESLint + Prettier check
+2. **Type Check** — `tsc --noEmit` across all packages
+3. **Test** — Vitest across all packages
+4. **Docker Build Check** — validates both Dockerfiles build to the `builder` stage
+
+The **deploy workflow** (`.github/workflows/deploy.yml`) triggers on pushes to `main`, builds production Docker images, pushes them to GHCR, and deploys both services to Railway. Requires `RAILWAY_TOKEN` secret.

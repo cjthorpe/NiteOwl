@@ -10,9 +10,11 @@ export type {
   NewActivity,
   NewIntegration,
   NewOauthToken,
+  NewRefreshToken,
   NewUser,
   NewWebhookEvent,
   OauthToken,
+  RefreshToken,
   User,
   WebhookEvent,
 } from "./schema";
