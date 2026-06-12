@@ -1,0 +1,37 @@
+# Railway project configuration
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "DOCKERFILE"
+
+# ── API service ────────────────────────────────────────────────────────────────
+[[services]]
+name = "api"
+source = "apps/api"
+
+[services.build]
+dockerfilePath = "apps/api/Dockerfile"
+dockerfileTarget = "production"
+watchPatterns = ["apps/api/**", "packages/shared/**"]
+
+[services.deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# ── Web service ────────────────────────────────────────────────────────────────
+[[services]]
+name = "web"
+source = "apps/web"
+
+[services.build]
+dockerfilePath = "apps/web/Dockerfile"
+dockerfileTarget = "production"
+watchPatterns = ["apps/web/**", "packages/shared/**"]
+
+[services.deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
