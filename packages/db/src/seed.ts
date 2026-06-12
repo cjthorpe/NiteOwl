@@ -1,8 +1,9 @@
 /**
  * Seed script for local development.
  *
- * Inserts fake users, integrations, oauth tokens, activities, and webhook
- * events so engineers can start the dev server with realistic data.
+ * Inserts fake users, integrations, oauth tokens, activity_events,
+ * slack_alert_configs, and webhook events so engineers can start the dev
+ * server with realistic data.
  *
  * Usage:
  *   DATABASE_URL=postgres://... pnpm --filter @niteowl/db db:seed
@@ -24,6 +25,13 @@ const LINEAR_EVENT_TYPES = ["issue_created", "issue_updated", "comment"] as cons
 const JIRA_EVENT_TYPES = ["issue_created", "issue_updated", "sprint_started"] as const;
 const SLACK_EVENT_TYPES = ["message", "reaction_added", "channel_joined"] as const;
 
+const PROVIDER_SCOPES: Record<string, string> = {
+  github: "repo read:user notifications",
+  linear: "read write",
+  jira: "read:jira-work write:jira-work",
+  slack: "channels:read chat:write reactions:read",
+};
+
 function randomChoice<T>(arr: readonly T[]): T {
   const idx = Math.floor(Math.random() * arr.length);
   if (idx >= arr.length) throw new Error("empty array");
@@ -36,8 +44,8 @@ function daysAgo(n: number): Date {
   return d;
 }
 
+/** Placeholder: real code would AES-256-GCM encrypt before storage */
 function fakeEncrypted(value: string): string {
-  // Placeholder: real code would AES-256-GCM encrypt before storage.
   return `enc:v1:${Buffer.from(value).toString("base64")}`;
 }
 
@@ -55,9 +63,9 @@ async function seed(): Promise<void> {
   // Users
   // ------------------------------------------------------------------
   const seedUsers = [
-    { email: "alice@example.com" },
-    { email: "bob@example.com" },
-    { email: "carol@example.com" },
+    { email: "alice@example.com", displayName: "Alice" },
+    { email: "bob@example.com", displayName: "Bob" },
+    { email: "carol@example.com", displayName: "Carol" },
   ];
 
   const insertedUsers = await db
@@ -75,9 +83,13 @@ async function seed(): Promise<void> {
   }
 
   // ------------------------------------------------------------------
-  // OAuth tokens + integrations
+  // OAuth tokens + integrations (one per user per provider)
   // ------------------------------------------------------------------
+  const integrationsByUser: Record<string, Record<string, string>> = {};
+
   for (const user of insertedUsers) {
+    integrationsByUser[user.id] = {};
+
     for (const provider of PROVIDERS) {
       await db
         .insert(schema.oauthTokens)
@@ -87,32 +99,44 @@ async function seed(): Promise<void> {
           accessTokenEncrypted: fakeEncrypted(`at-${provider}-${user.id}`),
           refreshTokenEncrypted: fakeEncrypted(`rt-${provider}-${user.id}`),
           expiresAt: daysAgo(-30), // expires 30 days from now
+          scopes: PROVIDER_SCOPES[provider],
         })
         .onConflictDoNothing();
 
-      await db
+      const [integration] = await db
         .insert(schema.integrations)
         .values({
           userId: user.id,
           provider,
           configJson: { autoSync: true, webhooksEnabled: true },
+          encryptedSecret: fakeEncrypted(`webhook-secret-${provider}-${user.id}`),
+          enabled: true,
           connectedAt: daysAgo(60),
           lastSyncedAt: daysAgo(1),
         })
-        .onConflictDoNothing();
+        .returning();
+
+      if (integration) {
+        integrationsByUser[user.id]![provider] = integration.id;
+      }
     }
   }
 
-  console.log(`  oauth_tokens + integrations: seeded for ${insertedUsers.length} users × 4 providers`);
+  console.log(
+    `  oauth_tokens + integrations: seeded for ${insertedUsers.length} users × 4 providers`,
+  );
 
   // ------------------------------------------------------------------
-  // Activities (30 per user across providers)
+  // Activity events (30 per user across providers)
   // ------------------------------------------------------------------
-  const activityRows: schema.NewActivity[] = [];
+  const activityRows: schema.NewActivityEvent[] = [];
 
   for (const user of insertedUsers) {
     for (let i = 0; i < 30; i++) {
       const provider = randomChoice(PROVIDERS);
+      const integrationId = integrationsByUser[user.id]?.[provider];
+      if (!integrationId) continue;
+
       const eventTypeMap = {
         github: GITHUB_EVENT_TYPES,
         linear: LINEAR_EVENT_TYPES,
@@ -120,35 +144,60 @@ async function seed(): Promise<void> {
         slack: SLACK_EVENT_TYPES,
       } as const;
       const eventType = randomChoice(eventTypeMap[provider]);
-      const sourceId = `${provider}-evt-${user.id.slice(0, 8)}-${i}`;
+      const externalId = `${provider}-evt-${user.id.slice(0, 8)}-${i}`;
 
       activityRows.push({
         userId: user.id,
+        integrationId,
         provider,
         eventType,
-        sourceId,
+        externalId,
         title: `[${provider}] ${eventType} #${i + 1}`,
-        url: `https://${provider}.example.com/events/${sourceId}`,
-        metadataJson: { seeded: true, index: i },
+        url: `https://${provider}.example.com/events/${externalId}`,
+        metadata: { seeded: true, index: i },
         occurredAt: daysAgo(Math.floor(Math.random() * 30)),
       });
     }
   }
 
   const insertedActivities = await db
-    .insert(schema.activities)
+    .insert(schema.activityEvents)
     .values(activityRows)
     .onConflictDoNothing()
     .returning();
 
-  console.log(`  activities: ${insertedActivities.length} inserted`);
+  console.log(`  activity_events: ${insertedActivities.length} inserted`);
 
   // ------------------------------------------------------------------
-  // Webhook events (idempotency records)
+  // Slack alert configs (one per user)
+  // ------------------------------------------------------------------
+  const slackConfigRows: schema.NewSlackAlertConfig[] = insertedUsers.map(
+    (user) => ({
+      userId: user.id,
+      webhookUrlEncrypted: fakeEncrypted(
+        `https://hooks.slack.com/services/T00000/${user.id.slice(0, 8)}`,
+      ),
+      watchedRepos: ["niteowl/api", "niteowl/web"],
+    }),
+  );
+
+  const insertedSlackConfigs = await db
+    .insert(schema.slackAlertConfigs)
+    .values(slackConfigRows)
+    .onConflictDoNothing()
+    .returning();
+
+  console.log(`  slack_alert_configs: ${insertedSlackConfigs.length} inserted`);
+
+  // ------------------------------------------------------------------
+  // Webhook events (idempotency records for the first 20 activities)
   // ------------------------------------------------------------------
   const webhookRows: schema.NewWebhookEvent[] = activityRows.slice(0, 20).map((a) => ({
     provider: a.provider,
-    payloadHash: payloadHash(a.provider, a.sourceId),
+    payloadHash: payloadHash(a.provider, a.externalId),
+    eventType: a.eventType,
+    status: "processed" as const,
+    processedAt: new Date(),
   }));
 
   const insertedWebhooks = await db

@@ -5,18 +5,21 @@ import * as schema from "./schema";
 export { schema };
 
 export type {
-  Activity,
+  ActivityEvent,
   Integration,
-  NewActivity,
+  NewActivityEvent,
   NewIntegration,
   NewOauthToken,
   NewRefreshToken,
+  NewSlackAlertConfig,
   NewUser,
   NewWebhookEvent,
   OauthToken,
   RefreshToken,
+  SlackAlertConfig,
   User,
   WebhookEvent,
+  WebhookEventStatus,
 } from "./schema";
 
 export function createDb(connectionString: string) {
