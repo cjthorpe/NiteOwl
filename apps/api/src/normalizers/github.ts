@@ -18,7 +18,7 @@ interface GitHubPullRequestPayload {
     updated_at: string;
     state: string;
     user: { login: string };
-    base: { repo: { full_name: string } };
+    base: { ref: string; repo: { full_name: string } };
   };
   repository: { full_name: string };
   sender: { login: string };
@@ -109,6 +109,7 @@ function normalizePullRequest(
       author: pr.user.login,
       sender: payload.sender.login,
       state: pr.state,
+      baseBranch: pr.base.ref,
     },
     occurredAt,
     ingestedAt: new Date().toISOString(),

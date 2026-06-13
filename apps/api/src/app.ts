@@ -5,6 +5,7 @@ import Fastify from "fastify";
 import type { HealthStatus } from "@niteowl/types";
 import { createDb } from "@niteowl/db";
 import authPlugin from "./plugins/auth.js";
+import queuePlugin from "./plugins/queue.js";
 import redisPlugin from "./plugins/redis.js";
 import { authRoutes } from "./routes/auth/index.js";
 import { feedRoutes } from "./routes/feed/index.js";
@@ -73,6 +74,15 @@ export function buildApp(opts: BuildAppOptions = {}) {
         "postgres://niteowl:niteowl@localhost:5432/niteowl",
     );
 
+  // ── BullMQ: normalization queue + worker ──────────────────────────────────
+  // Only wired up in production (when no injected mock db is present).
+  // In test mode the queue remains undefined; webhook handlers acknowledge
+  // without processing — matching their existing behaviour.
+  const enableQueue = !opts.db;
+  if (enableQueue) {
+    app.register(queuePlugin, { db });
+  }
+
   // ── Security: HTTP security headers ───────────────────────────────────────
   app.addHook("onSend", (_request, reply, _payload, done) => {
     void reply.header("X-Content-Type-Options", "nosniff");
@@ -113,8 +123,21 @@ export function buildApp(opts: BuildAppOptions = {}) {
   app.register(feedRoutes, { prefix: "/api/feed", db });
   app.register(integrationsRoutes, { prefix: "/api/integrations", db });
 
-  // Webhook receivers — no auth, secured by provider-specific signatures
-  app.register(githubWebhookRoutes, { prefix: "/api/webhooks/github", db });
+  // Webhook receivers — no auth, secured by provider-specific signatures.
+  // GitHub handler is registered inside app.after() so the queue decoration
+  // from queuePlugin is available when opts are read by the plugin.
+  app.after(() => {
+    const rawQueue = enableQueue
+      ? ((app as unknown as { normalizationQueue: import("bullmq").Queue<import("@niteowl/types").NormalizationJobData> | null })
+          .normalizationQueue ?? undefined)
+      : undefined;
+
+    app.register(githubWebhookRoutes, {
+      prefix: "/api/webhooks/github",
+      db,
+      ...(rawQueue != null ? { queue: rawQueue } : {}),
+    });
+  });
   app.register(linearWebhookRoutes, { prefix: "/api/webhooks", db });
 
   // Slack alert configuration
