@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IntegrationCard } from '../components/integration-card/IntegrationCard';
 import { ProgressStepper } from '../components/ui/ProgressStepper';
@@ -22,14 +21,6 @@ export function Onboarding() {
   const navigate = useNavigate();
   const { isConnected } = useIntegrations();
   const githubConnected = isConnected(PRIMARY_PROVIDER);
-
-  // Auto-advance: if both primary and at least one optional are connected, go to dashboard
-  useEffect(() => {
-    if (githubConnected && OPTIONAL_PROVIDERS.some(isConnected)) {
-      // slight delay so user sees step 2 before redirect
-    }
-  }, [githubConnected, isConnected]);
-
   const step = githubConnected ? 2 : 1;
 
   return (
