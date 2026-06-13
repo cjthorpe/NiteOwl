@@ -158,7 +158,12 @@ export const slackAlertConfigs = pgTable("slack_alert_configs", {
   webhookUrlEncrypted: text("webhook_url_encrypted").notNull(),
   /** Repo full-names to watch, e.g. ["owner/repo", "org/another"] */
   watchedRepos: text("watched_repos").array().notNull().default([]),
+  /** Whether alerts are active — can be toggled independently of feed integrations */
+  enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });

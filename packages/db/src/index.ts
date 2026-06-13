@@ -3,6 +3,7 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 export { schema };
+export { encrypt, decrypt, encryptOptional, decryptOptional } from "./encryption.js";
 
 export type {
   ActivityEvent,
