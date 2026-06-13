@@ -4,11 +4,11 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 
-import { generateOpaqueToken, sha256 } from "../../lib/crypto.js";
+import { sha256 } from "../../lib/crypto.js";
 import { signAccessToken, signRefreshToken } from "../../lib/jwt.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 
-const REFRESH_COOKIE = "niteowl_refresh";
+import { REFRESH_COOKIE } from "./constants.js";
 
 interface RegisterBody {
   email: string;

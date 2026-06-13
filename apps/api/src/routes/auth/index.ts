@@ -8,8 +8,8 @@ import { sha256 } from "../../lib/crypto.js";
 import { signAccessToken, signRefreshToken } from "../../lib/jwt.js";
 import { emailAuthRoutes } from "./email.js";
 import { githubAuthRoutes } from "./github.js";
-
-const REFRESH_COOKIE = "niteowl_refresh";
+import { linearAuthRoutes } from "./linear.js";
+import { REFRESH_COOKIE } from "./constants.js";
 
 export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
   fastify,
@@ -22,6 +22,9 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
   // ── GitHub OAuth ──────────────────────────────────────────────────────────
   fastify.register(githubAuthRoutes, { ...opts, prefix: "" });
+
+  // ── Linear OAuth ──────────────────────────────────────────────────────────
+  fastify.register(linearAuthRoutes, { ...opts, prefix: "" });
 
   // ── POST /auth/refresh ────────────────────────────────────────────────────
   fastify.post("/refresh", {

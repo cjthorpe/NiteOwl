@@ -4,11 +4,12 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 
-import { generateOAuthState, generateOpaqueToken, sha256, timingSafeCompare } from "../../lib/crypto.js";
-import { signAccessToken, signRefreshToken } from "../../lib/jwt.js";
+import { generateOAuthState, sha256, timingSafeCompare } from "../../lib/crypto.js";
+import { signRefreshToken } from "../../lib/jwt.js";
+
+import { REFRESH_COOKIE } from "./constants.js";
 
 const STATE_COOKIE = "niteowl_oauth_state";
-const REFRESH_COOKIE = "niteowl_refresh";
 
 interface GitHubUser {
   id: number;
@@ -179,7 +180,6 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           }
         }
 
-        const accessToken = await signAccessToken(user.id, user.email);
         const { token: rawRefresh, expiresAt } = await signRefreshToken(
           user.id,
           user.email,
@@ -199,11 +199,11 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           expires: expiresAt,
         });
 
-        // Redirect to frontend with access token in URL fragment (never logged)
-        return reply.redirect(
-          302,
-          `${webRoot}/auth/callback#token=${accessToken}`,
-        );
+        // Redirect to frontend; the frontend must call POST /auth/refresh to
+        // obtain a short-lived access token from the HttpOnly refresh cookie.
+        // Never put access tokens in URLs — they appear in browser history and
+        // are readable by any JS on the page (violates OAuth 2.0 Security BCP).
+        return reply.redirect(302, `${webRoot}/auth/callback`);
       } catch {
         // Never expose raw error messages to the client — they may contain
         // internal details (DB connection strings, stack traces, etc.)
