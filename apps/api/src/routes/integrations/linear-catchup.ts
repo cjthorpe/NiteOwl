@@ -172,7 +172,7 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
         issues = await fetchRecentlyCompletedIssues(accessToken, since);
       } catch (err) {
         const message = err instanceof Error ? err.message : "fetch_failed";
-        request.log.error("[linear-catchup] Failed to fetch issues", { error: message });
+        request.log.error({ error: message }, "[linear-catchup] Failed to fetch issues");
         return reply.code(502).send({ success: false, error: message });
       }
 

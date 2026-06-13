@@ -94,7 +94,7 @@ export function normalizeSlackEvent(
     eventType: "issue_updated",
     sourceId: `message:${typed.event_id}`,
     title: `Slack message in #${channel}`,
-    description: truncated || undefined,
+    ...(truncated ? { description: truncated } : {}),
     url,
     metadata: {
       channelId: channel,

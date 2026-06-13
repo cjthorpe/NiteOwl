@@ -110,7 +110,7 @@ export function normalizeJiraEvent(
     eventType,
     sourceId: `issue:${issue.id}:${typed.webhookEvent}`,
     title: `[${fields.project.key}] ${issue.key}: ${fields.summary}`,
-    description: fields.description ?? undefined,
+    ...(fields.description != null ? { description: fields.description } : {}),
     url: browseUrl,
     metadata: {
       issueKey: issue.key,

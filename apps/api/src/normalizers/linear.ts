@@ -88,7 +88,7 @@ function normalizeIssue(
     eventType,
     sourceId: `issue:${data.id}:${action}`,
     title: `[${data.team.key}] ${data.identifier}: ${data.title}`,
-    description: data.description ?? undefined,
+    ...(data.description != null ? { description: data.description } : {}),
     url: data.url,
     metadata: {
       identifier: data.identifier,

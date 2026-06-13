@@ -106,8 +106,8 @@ export const linearWebhookRoutes: FastifyPluginAsync<{ db: Db }> = async (
       } catch {
         // Unique constraint on (provider, payloadHash) → duplicate delivery.
         request.log.info(
-          "[linear-webhook] Duplicate delivery, acknowledging",
           { payloadHash },
+          "[linear-webhook] Duplicate delivery, acknowledging",
         );
         return reply.code(200).send({ status: "duplicate" });
       }
@@ -140,8 +140,8 @@ export const linearWebhookRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       if (!integration) {
         request.log.warn(
-          "[linear-webhook] No enabled integration for org",
           { organizationId },
+          "[linear-webhook] No enabled integration for org",
         );
         await markWebhookStatus(db, payloadHash, "failed");
         return reply.code(200).send({ status: "no_integration" });
@@ -152,8 +152,8 @@ export const linearWebhookRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       if (!activity) {
         request.log.debug(
-          "[linear-webhook] Event not actionable, skipping",
           { eventType, action: payload["action"] },
+          "[linear-webhook] Event not actionable, skipping",
         );
         await markWebhookStatus(db, payloadHash, "processed");
         return reply.code(200).send({ status: "skipped" });
@@ -184,12 +184,12 @@ export const linearWebhookRoutes: FastifyPluginAsync<{ db: Db }> = async (
       await markWebhookStatus(db, payloadHash, "processed");
 
       request.log.info(
-        "[linear-webhook] Ingested activity",
         {
           eventType: activity.eventType,
           sourceId: activity.sourceId,
           userId: integration.userId,
         },
+        "[linear-webhook] Ingested activity",
       );
 
       return reply.code(200).send({ status: "ok" });

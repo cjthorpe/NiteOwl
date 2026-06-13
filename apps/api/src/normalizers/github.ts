@@ -101,7 +101,7 @@ function normalizePullRequest(
     eventType,
     sourceId: `pr:${pr.id}:${action}`,
     title: `[${payload.repository.full_name}] PR #${pr.number}: ${pr.title}`,
-    description: pr.body ?? undefined,
+    ...(pr.body != null ? { description: pr.body } : {}),
     url: pr.html_url,
     metadata: {
       prNumber: pr.number,
@@ -168,7 +168,7 @@ function normalizeIssue(
     eventType,
     sourceId: `issue:${issue.id}:${action}`,
     title: `[${payload.repository.full_name}] Issue #${issue.number}: ${issue.title}`,
-    description: issue.body ?? undefined,
+    ...(issue.body != null ? { description: issue.body } : {}),
     url: issue.html_url,
     metadata: {
       issueNumber: issue.number,
