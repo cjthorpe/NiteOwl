@@ -7,7 +7,7 @@ Monorepo for the NiteOwl application — React/TypeScript frontend, Fastify API,
 | Layer | Tech |
 |-------|------|
 | Frontend | React 18, TypeScript (strict), Vite |
-| API | Node.js 20 LTS, Fastify 4, TypeScript |
+| API | Node.js 22 LTS, Fastify 4, TypeScript |
 | Database | PostgreSQL 16 via Drizzle ORM |
 | Cache / Queue | Redis 7, ioredis |
 | Package manager | pnpm workspaces + Turborepo |
@@ -38,7 +38,7 @@ niteowl/
 ## Prerequisites
 
 - [Docker Desktop](https://docs.docker.com/get-docker/) (includes Compose v2)
-- [Node.js 20 LTS](https://nodejs.org/)
+- [Node.js 22 LTS](https://nodejs.org/)
 - [pnpm 9+](https://pnpm.io/installation): `corepack enable && corepack prepare pnpm@latest --activate`
 
 ## Local development (one command)
