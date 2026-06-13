@@ -9,10 +9,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts"],
-  "references": [
-    { "path": "../../packages/types" },
-    { "path": "../../packages/shared" },
-    { "path": "../../packages/db" }
-  ]
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

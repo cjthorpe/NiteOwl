@@ -21,13 +21,6 @@ export const providerEnum = pgEnum("provider", [
   "slack",
 ]);
 
-export const webhookEventStatusEnum = pgEnum("webhook_event_status", [
-  "received",
-  "processed",
-  "failed",
-  "duplicate",
-]);
-
 // ---------------------------------------------------------------------------
 // users
 // ---------------------------------------------------------------------------
@@ -62,11 +55,11 @@ export const oauthTokens = pgTable("oauth_tokens", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   provider: providerEnum("provider").notNull(),
-  // Encrypted application-side (AES-256-GCM) before storage; raw token never written here.
+  // AES-256-GCM encrypted before storage; raw token never written here.
   accessTokenEncrypted: text("access_token_encrypted").notNull(),
   refreshTokenEncrypted: text("refresh_token_encrypted"),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
-  /** Space-separated OAuth scopes granted for this token */
+  /** Space-separated OAuth scopes granted, e.g. "repo read:user" */
   scopes: text("scopes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -89,10 +82,8 @@ export const integrations = pgTable("integrations", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   provider: providerEnum("provider").notNull(),
-  /** AES-256-GCM encrypted provider config JSON; base64(ciphertext):base64(iv):base64(tag) */
+  /** AES-256-GCM encrypted JSON config; decrypted at application layer */
   configJson: jsonb("config_json"),
-  /** AES-256-GCM encrypted HMAC webhook secret */
-  encryptedSecret: text("encrypted_secret"),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -122,7 +113,7 @@ export const activityEvents = pgTable(
       .references(() => integrations.id, { onDelete: "cascade" }),
     provider: providerEnum("provider").notNull(),
     eventType: text("event_type").notNull(),
-    /** Provider's native event identifier — combined with integration_id for idempotent ingestion */
+    /** Provider-native event ID — combined with integration_id for idempotent ingestion */
     externalId: text("external_id").notNull(),
     title: text("title").notNull(),
     url: text("url"),
@@ -138,12 +129,12 @@ export const activityEvents = pgTable(
       table.userId,
       table.occurredAt.desc(),
     ),
-    // Secondary lookup: events per integration ordered by time.
+    // Secondary pattern: all events for a given integration ordered by time.
     index("activity_events_integration_id_occurred_at_idx").on(
       table.integrationId,
       table.occurredAt,
     ),
-    // Idempotent ingestion: same external event from the same integration stored once.
+    // Idempotent ingestion: same external event per integration never inserted twice.
     unique("activity_events_integration_external_uniq").on(
       table.integrationId,
       table.externalId,
@@ -163,9 +154,9 @@ export const slackAlertConfigs = pgTable("slack_alert_configs", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  /** Slack Incoming Webhook URL — AES-256-GCM encrypted before storage */
+  /** AES-256-GCM encrypted Slack incoming-webhook URL */
   webhookUrlEncrypted: text("webhook_url_encrypted").notNull(),
-  /** Repo slugs to watch, e.g. ["owner/repo", "owner/other-repo"] */
+  /** Repo full-names to watch, e.g. ["owner/repo", "org/another"] */
   watchedRepos: text("watched_repos").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -179,14 +170,21 @@ export type NewSlackAlertConfig = typeof slackAlertConfigs.$inferInsert;
 // webhook_events  (idempotency table)
 // ---------------------------------------------------------------------------
 
+export const webhookEventStatusEnum = pgEnum("webhook_event_status", [
+  "received",
+  "processed",
+  "failed",
+  "duplicate",
+]);
+
 export const webhookEvents = pgTable(
   "webhook_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     provider: providerEnum("provider").notNull(),
-    /** Provider-assigned delivery ID (e.g. X-GitHub-Delivery header) */
+    // Provider-assigned delivery ID (e.g. X-GitHub-Delivery header).
     deliveryId: text("delivery_id"),
-    /** SHA-256 hash of the raw payload body — fallback idempotency key */
+    // SHA-256 hash of the raw payload body — fallback idempotency key.
     payloadHash: text("payload_hash").notNull(),
     eventType: text("event_type"),
     status: webhookEventStatusEnum("status").notNull().default("received"),
@@ -196,10 +194,12 @@ export const webhookEvents = pgTable(
       .defaultNow(),
   },
   (table) => [
+    // Unique index guarantees each payload is processed exactly once.
     unique("webhook_events_provider_hash_uniq").on(
       table.provider,
       table.payloadHash,
     ),
+    // Also deduplicate by provider delivery ID when present.
     index("webhook_events_delivery_id_idx").on(table.provider, table.deliveryId),
   ],
 );
