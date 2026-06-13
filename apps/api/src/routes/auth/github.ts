@@ -98,8 +98,8 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
     });
 
     return reply.redirect(
-      302,
       `https://github.com/login/oauth/authorize?${params.toString()}`,
+      302,
     );
   });
 
@@ -111,19 +111,19 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
       const webRoot = process.env["WEB_URL"] ?? "http://localhost:5173";
 
       if (error) {
-        return reply.redirect(302, `${webRoot}/login?error=${encodeURIComponent(error)}`);
+        return reply.redirect(`${webRoot}/login?error=${encodeURIComponent(error)}`, 302);
       }
 
       const storedState = request.cookies[STATE_COOKIE];
       // Timing-safe comparison prevents state oracle attacks.
       if (!state || !storedState || !timingSafeCompare(state, storedState)) {
-        return reply.redirect(302, `${webRoot}/login?error=state_mismatch`);
+        return reply.redirect(`${webRoot}/login?error=state_mismatch`, 302);
       }
 
       reply.clearCookie(STATE_COOKIE, { path: "/auth/github" });
 
       if (!code) {
-        return reply.redirect(302, `${webRoot}/login?error=no_code`);
+        return reply.redirect(`${webRoot}/login?error=no_code`, 302);
       }
 
       try {
@@ -134,10 +134,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           ghUser.email ?? (await getGitHubPrimaryEmail(ghToken));
 
         if (!email) {
-          return reply.redirect(
-            302,
-            `${webRoot}/login?error=no_email`,
-          );
+          return reply.redirect(`${webRoot}/login?error=no_email`, 302);
         }
 
         const githubId = String(ghUser.id);
@@ -203,11 +200,11 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         // obtain a short-lived access token from the HttpOnly refresh cookie.
         // Never put access tokens in URLs — they appear in browser history and
         // are readable by any JS on the page (violates OAuth 2.0 Security BCP).
-        return reply.redirect(302, `${webRoot}/auth/callback`);
+        return reply.redirect(`${webRoot}/auth/callback`, 302);
       } catch {
         // Never expose raw error messages to the client — they may contain
         // internal details (DB connection strings, stack traces, etc.)
-        return reply.redirect(302, `${webRoot}/login?error=server_error`);
+        return reply.redirect(`${webRoot}/login?error=server_error`, 302);
       }
     },
   );

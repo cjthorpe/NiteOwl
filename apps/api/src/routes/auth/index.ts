@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { eq, gt, isNotNull, isNull, and } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 
 import type { Db } from "@niteowl/db";
@@ -6,10 +6,10 @@ import { schema } from "@niteowl/db";
 
 import { sha256 } from "../../lib/crypto.js";
 import { signAccessToken, signRefreshToken } from "../../lib/jwt.js";
+import { REFRESH_COOKIE } from "./constants.js";
 import { emailAuthRoutes } from "./email.js";
 import { githubAuthRoutes } from "./github.js";
 import { linearAuthRoutes } from "./linear.js";
-import { REFRESH_COOKIE } from "./constants.js";
 
 export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
   fastify,
@@ -38,21 +38,44 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
       const tokenHash = sha256(rawToken);
       const now = new Date();
 
+      // Look up the token regardless of rotated_at so we can distinguish:
+      //   not found at all       → invalid / never issued (or expired & purged)
+      //   rotatedAt IS NOT NULL  → replay of a consumed token — indicates theft
+      //   rotatedAt IS NULL      → valid, rotate normally
       const [stored] = await db
         .select({
           id: schema.refreshTokens.id,
           userId: schema.refreshTokens.userId,
+          rotatedAt: schema.refreshTokens.rotatedAt,
+          expiresAt: schema.refreshTokens.expiresAt,
         })
         .from(schema.refreshTokens)
-        .where(
-          and(
-            eq(schema.refreshTokens.tokenHash, tokenHash),
-            gt(schema.refreshTokens.expiresAt, now),
-          ),
-        )
+        .where(eq(schema.refreshTokens.tokenHash, tokenHash))
         .limit(1);
 
       if (!stored) {
+        // Token was never issued or has been fully purged — not a replay.
+        reply.clearCookie(REFRESH_COOKIE, { path: "/auth" });
+        return reply.code(401).send({ success: false, error: "Invalid or expired refresh token" });
+      }
+
+      // ── Replay detection (nuclear option) ────────────────────────────────
+      // A rotated token that is presented again means the session was cloned or
+      // the token was stolen. Revoke every active token for this user to force
+      // full re-authentication.
+      if (stored.rotatedAt !== null) {
+        await db
+          .delete(schema.refreshTokens)
+          .where(eq(schema.refreshTokens.userId, stored.userId));
+        reply.clearCookie(REFRESH_COOKIE, { path: "/auth" });
+        return reply.code(401).send({
+          success: false,
+          error: "Refresh token already used — all sessions revoked",
+        });
+      }
+
+      // ── Check expiry on a still-active token ─────────────────────────────
+      if (stored.expiresAt <= now) {
         reply.clearCookie(REFRESH_COOKIE, { path: "/auth" });
         return reply.code(401).send({ success: false, error: "Invalid or expired refresh token" });
       }
@@ -67,9 +90,10 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
         return reply.code(401).send({ success: false, error: "User not found" });
       }
 
-      // Rotating refresh token: delete the consumed token and issue a new one.
+      // ── Rotate: soft-mark the consumed token, issue a fresh one ──────────
       await db
-        .delete(schema.refreshTokens)
+        .update(schema.refreshTokens)
+        .set({ rotatedAt: now })
         .where(eq(schema.refreshTokens.id, stored.id));
 
       const { token: newRawRefresh, expiresAt: newExpiresAt } =

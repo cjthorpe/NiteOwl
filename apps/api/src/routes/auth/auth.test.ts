@@ -17,10 +17,12 @@ const mockDb = {
   where: vi.fn().mockReturnThis(),
   limit: vi.fn().mockImplementation(() => Promise.resolve(selectRows)),
   insert: vi.fn().mockReturnThis(),
+  // values must return `this` so .returning() can be chained on inserts
   values: vi.fn().mockReturnThis(),
   returning: vi.fn().mockImplementation(() => Promise.resolve(insertedRows)),
   delete: vi.fn().mockReturnThis(),
   update: vi.fn().mockReturnThis(),
+  // set must return `this` so .where() can be chained on updates
   set: vi.fn().mockReturnThis(),
 };
 
@@ -162,7 +164,7 @@ describe("POST /auth/refresh", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("returns 401 for an unknown/expired refresh token", async () => {
+  it("returns 401 for an unknown/never-issued refresh token", async () => {
     selectRows = []; // no matching token in DB
 
     const app = buildApp({ db: mockDb as never });
@@ -173,24 +175,33 @@ describe("POST /auth/refresh", () => {
     });
 
     expect(res.statusCode).toBe(401);
+    const body = res.json<{ error: string }>();
+    expect(body.error).toMatch(/invalid or expired/i);
   });
 });
 
 // ── Tests: POST /auth/refresh (happy path + rotation) ─────────────────────
 describe("POST /auth/refresh — token rotation", () => {
   it("issues a new access token and rotates the refresh cookie on success", async () => {
-    // limit() is the terminal call on select chains — override per-call.
-    // 1st call: find stored refresh token; 2nd call: look up user.
+    const futureExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // 1st limit() call: find the stored token (active, not yet rotated).
+    // 2nd limit() call: look up the user.
     mockDb.limit
       .mockImplementationOnce(() =>
-        Promise.resolve([{ id: "rt-001", userId: "user-001" }]),
+        Promise.resolve([{
+          id: "rt-001",
+          userId: "user-001",
+          rotatedAt: null,
+          expiresAt: futureExpiry,
+        }]),
       )
       .mockImplementationOnce(() =>
         Promise.resolve([{ id: "user-001", email: "alice@example.com" }]),
       );
 
-    // delete().where() and insert().values() chain back to mockDb via
-    // mockReturnThis — awaiting a non-thenable resolves immediately.
+    // update().set().where() chain resolves via mockReturnThis → set returns Promise
+    // insert().values() also resolves via the values mock
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -206,6 +217,101 @@ describe("POST /auth/refresh — token rotation", () => {
     expect(body.data.accessToken.split(".")).toHaveLength(3);
 
     // A new refresh cookie must be set (token rotation)
+    const setCookieHeader = res.headers["set-cookie"] as string | string[];
+    const cookieStr = Array.isArray(setCookieHeader)
+      ? setCookieHeader.join("; ")
+      : (setCookieHeader ?? "");
+    expect(cookieStr).toMatch(/niteowl_refresh/);
+
+    // The update (soft-mark rotatedAt) must have been called
+    expect(mockDb.update).toHaveBeenCalled();
+    // A fresh token must have been inserted
+    expect(mockDb.insert).toHaveBeenCalled();
+  });
+
+  it("returns 401 for an expired token that was not yet rotated", async () => {
+    const pastExpiry = new Date(Date.now() - 1000);
+
+    mockDb.limit.mockImplementationOnce(() =>
+      Promise.resolve([{
+        id: "rt-expired",
+        userId: "user-001",
+        rotatedAt: null,
+        expiresAt: pastExpiry,
+      }]),
+    );
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      cookies: { niteowl_refresh: "expired-token" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json<{ error: string }>();
+    expect(body.error).toMatch(/invalid or expired/i);
+    // Must NOT have tried to issue a new token
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+});
+
+// ── Tests: POST /auth/refresh — replay detection ───────────────────────────
+describe("POST /auth/refresh — replay detection (nuclear option)", () => {
+  it("revokes all user sessions when a previously-rotated token is replayed", async () => {
+    const futureExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // The token exists in DB but has already been rotated (stolen scenario).
+    mockDb.limit.mockImplementationOnce(() =>
+      Promise.resolve([{
+        id: "rt-already-used",
+        userId: "user-stolen",
+        rotatedAt: new Date(Date.now() - 60_000), // rotated 1 min ago
+        expiresAt: futureExpiry,
+      }]),
+    );
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      cookies: { niteowl_refresh: "stolen-old-token" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json<{ success: boolean; error: string }>();
+    expect(body.success).toBe(false);
+    expect(body.error).toMatch(/already used.*sessions revoked/i);
+
+    // The nuclear delete must have been triggered
+    expect(mockDb.delete).toHaveBeenCalled();
+
+    // No new token should have been issued
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("clears the refresh cookie after replay detection", async () => {
+    const futureExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    mockDb.limit.mockImplementationOnce(() =>
+      Promise.resolve([{
+        id: "rt-already-used",
+        userId: "user-stolen",
+        rotatedAt: new Date(),
+        expiresAt: futureExpiry,
+      }]),
+    );
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      cookies: { niteowl_refresh: "stolen-old-token" },
+    });
+
+    expect(res.statusCode).toBe(401);
+
+    // Cookie must be cleared so the attacker's browser loses the session
     const setCookieHeader = res.headers["set-cookie"] as string | string[];
     const cookieStr = Array.isArray(setCookieHeader)
       ? setCookieHeader.join("; ")

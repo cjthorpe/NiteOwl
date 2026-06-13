@@ -127,8 +127,8 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
       });
 
       return reply.redirect(
-        302,
         `https://linear.app/oauth/authorize?${params.toString()}`,
+        302,
       );
     },
   );
@@ -147,25 +147,22 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         `${webRoot}/settings/integrations?error=${encodeURIComponent(msg)}`;
 
       if (error) {
-        return reply.redirect(302, errorRedirect(error));
+        return reply.redirect(errorRedirect(error), 302);
       }
 
       const storedState = request.cookies[STATE_COOKIE];
       if (!state || !storedState || !timingSafeCompare(state, storedState)) {
-        return reply.redirect(302, errorRedirect("state_mismatch"));
+        return reply.redirect(errorRedirect("state_mismatch"), 302);
       }
 
       reply.clearCookie(STATE_COOKIE, { path: "/auth/linear" });
 
       if (!code) {
-        return reply.redirect(302, errorRedirect("no_code"));
+        return reply.redirect(errorRedirect("no_code"), 302);
       }
 
       if (!request.user) {
-        return reply.redirect(
-          302,
-          `${webRoot}/login?error=session_expired`,
-        );
+        return reply.redirect(`${webRoot}/login?error=session_expired`, 302);
       }
 
       try {
@@ -245,12 +242,12 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           });
         }
 
-        return reply.redirect(302, successRedirect);
+        return reply.redirect(successRedirect, 302);
       } catch (err) {
         // Log the real error server-side; never expose internal details
         // (API error bodies, stack traces, etc.) in the redirect URL.
         fastify.log.error({ err }, "Linear OAuth callback error");
-        return reply.redirect(302, errorRedirect("server_error"));
+        return reply.redirect(errorRedirect("server_error"), 302);
       }
     },
   );
