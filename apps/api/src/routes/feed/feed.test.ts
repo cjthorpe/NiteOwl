@@ -246,6 +246,92 @@ describe("GET /api/feed", () => {
     expect(res.statusCode).toBe(200);
     expect(redisMock.get).not.toHaveBeenCalled();
   });
+
+  it("filters by ?author= and returns matching activities", async () => {
+    const now = new Date();
+    const botActivity = {
+      id: "event-bot-001",
+      userId: USER_ID,
+      integrationId: "int-001",
+      provider: "github",
+      eventType: "pr_merged",
+      externalId: "ext-bot-1",
+      title: "[org/repo] PR #1: Bot merged",
+      url: "https://github.com/org/repo/pull/1",
+      metadata: { author: "ai-agent-bot", sender: "ai-agent-bot" },
+      authorLogin: "ai-agent-bot",
+      occurredAt: new Date(now.getTime() - 60_000),
+      ingestedAt: now,
+    };
+
+    mockDb.limit
+      .mockResolvedValueOnce([botActivity]) // feed rows
+      .mockResolvedValueOnce([{ count: 1 }]); // count
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/feed?author=ai-agent-bot",
+      headers: { authorization: authHeader },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ activities: typeof botActivity[]; nextCursor: null; total: number }>();
+    expect(body.activities).toHaveLength(1);
+    expect(body.activities[0]?.authorLogin).toBe("ai-agent-bot");
+    expect(body.total).toBe(1);
+  });
+
+  it("returns empty feed when ?author= matches no events", async () => {
+    mockDb.limit
+      .mockResolvedValueOnce([])           // feed rows
+      .mockResolvedValueOnce([{ count: 0 }]); // count
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/feed?author=nonexistent-bot",
+      headers: { authorization: authHeader },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ activities: unknown[]; nextCursor: null; total: number }>();
+    expect(body.activities).toEqual([]);
+    expect(body.total).toBe(0);
+  });
+
+  it("includes author in the cache key (different authors produce different cache entries)", async () => {
+    // First request — author=bot-a
+    mockDb.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ count: 0 }]);
+
+    const app = buildApp({ db: mockDb as never });
+    await app.inject({
+      method: "GET",
+      url: "/api/feed?author=bot-a",
+      headers: { authorization: authHeader },
+    });
+
+    // Second request — author=bot-b (cache miss expected because different key)
+    mockDb.limit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ count: 0 }]);
+
+    await app.inject({
+      method: "GET",
+      url: "/api/feed?author=bot-b",
+      headers: { authorization: authHeader },
+    });
+
+    // redisMock.set should have been called twice with different keys
+    expect(redisMock.set).toHaveBeenCalledTimes(2);
+    const firstKey = (redisMock.set.mock.calls[0] as string[])[0];
+    const secondKey = (redisMock.set.mock.calls[1] as string[])[0];
+    expect(firstKey).not.toBe(secondKey);
+    expect(firstKey).toContain("a:bot-a");
+    expect(secondKey).toContain("a:bot-b");
+  });
 });
 
 // ── GET /api/integrations ───────────────────────────────────────────────────

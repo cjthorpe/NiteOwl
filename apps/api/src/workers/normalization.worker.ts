@@ -10,12 +10,44 @@ import { getEnabledAlertsForUser } from "../routes/slack-alerts/index.js";
 export const NORMALIZATION_QUEUE = "normalization";
 
 /**
+ * Extracts the actor login / display name from a normalized activity's metadata.
+ *
+ * Tries fields in priority order so that the most-actionable identity surfaces:
+ *   1. sender   — GitHub: who triggered the event (e.g. the bot that merged a PR)
+ *   2. author   — GitHub/Linear/Jira: who created the item or wrote the comment
+ *   3. creator  — Linear issues: display name of the issue creator
+ *   4. reporter — Jira issues: display name of the reporter
+ *   5. pusher   — GitHub push: name of the pusher
+ *
+ * Returns null when no recognisable actor field is present.
+ */
+export function extractAuthorLogin(
+  metadata: Record<string, unknown>,
+): string | null {
+  const candidates = [
+    metadata["sender"],
+    metadata["author"],
+    metadata["creator"],
+    metadata["reporter"],
+    metadata["pusher"],
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim() !== "") {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
  * Maps a canonical Activity (from the normalizer layer) to a DB insert row for
  * the `activity_events` table.
  *
  * Field mapping:
  *   Activity.sourceId   → activity_events.external_id  (provider-native dedup key)
  *   Activity.metadata   → activity_events.metadata      (jsonb)
+ *   extractAuthorLogin  → activity_events.author_login  (indexed actor column)
  */
 function activityToRow(
   activity: Activity,
@@ -31,6 +63,7 @@ function activityToRow(
     title: activity.title,
     url: activity.url ?? null,
     metadata: activity.metadata,
+    authorLogin: extractAuthorLogin(activity.metadata),
     occurredAt: new Date(activity.occurredAt),
     ingestedAt: new Date(activity.ingestedAt),
   };

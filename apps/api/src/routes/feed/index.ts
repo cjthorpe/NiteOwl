@@ -16,6 +16,7 @@ interface FeedQuery {
   provider?: string;
   eventType?: string;
   repo?: string;
+  author?: string;
   cursor?: string;
 }
 
@@ -55,12 +56,14 @@ function feedCacheKey(
   provider?: string,
   eventType?: string,
   repo?: string,
+  author?: string,
   cursor?: string,
 ): string {
   const parts = [`feed:${userId}:${hours}`];
   if (provider) parts.push(`p:${provider}`);
   if (eventType) parts.push(`et:${eventType}`);
   if (repo) parts.push(`r:${repo}`);
+  if (author) parts.push(`a:${author}`);
   if (cursor) parts.push(`c:${cursor}`);
   return parts.join(":");
 }
@@ -107,9 +110,10 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
       const provider = request.query.provider?.toLowerCase();
       const eventType = request.query.eventType?.toLowerCase();
       const repo = request.query.repo?.toLowerCase();
+      const author = request.query.author?.trim() || undefined;
       const cursorRaw = request.query.cursor;
 
-      const cacheKey = feedCacheKey(userId, hours, provider, eventType, repo, cursorRaw);
+      const cacheKey = feedCacheKey(userId, hours, provider, eventType, repo, author, cursorRaw);
 
       // ── Cache read ────────────────────────────────────────────────────────
       const redis = fastify.redis;
@@ -151,6 +155,10 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
         );
       }
 
+      if (author) {
+        conditions.push(eq(schema.activityEvents.authorLogin, author));
+      }
+
       // cursor: events strictly before (occurredAt, id)
       const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
       if (cursor) {
@@ -190,6 +198,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
             ...(provider && validProviders.includes(provider as (typeof validProviders)[number])
               ? [eq(schema.activityEvents.provider, provider as (typeof validProviders)[number])]
               : []),
+            ...(author ? [eq(schema.activityEvents.authorLogin, author)] : []),
           ),
         )
         .limit(1);
