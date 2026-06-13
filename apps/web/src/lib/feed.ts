@@ -1,4 +1,5 @@
 import type { Activity, ActivityProvider } from '@niteowl/types';
+import type { EventType } from '../types/filters';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
@@ -6,7 +7,7 @@ const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001
 export interface FeedParams {
   hours: number;
   providers: ActivityProvider[];
-  repo: string;
+  eventTypes: EventType[];
   page: number;
 }
 
@@ -22,8 +23,8 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
   if (params.providers.length > 0) {
     url.searchParams.set('provider', params.providers.join(','));
   }
-  if (params.repo) {
-    url.searchParams.set('repo', params.repo);
+  if (params.eventTypes.length > 0) {
+    url.searchParams.set('events', params.eventTypes.join(','));
   }
   url.searchParams.set('page', String(params.page));
 

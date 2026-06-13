@@ -1,14 +1,40 @@
 import './activity-feed.css';
 import { useFeed } from '../../hooks/useFeed';
-import { useFeedFilters } from '../../hooks/useFeedFilters';
+import { useFilters } from '../../hooks/useFilters';
+import type { TimeRange } from '../../types/filters';
+import type { ActivityProvider } from '@niteowl/types';
+import { FilterBar } from '../filter-bar/FilterBar';
 import { ActivityCard } from './ActivityCard';
 import { ActivityFeedSkeleton } from './ActivityCardSkeleton';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
-import { FeedFilterBar } from './FeedFilterBar';
+
+function timeRangeToHours(range: TimeRange): number {
+  switch (range) {
+    case '8h': return 8;
+    case '12h': return 12;
+    case '24h': return 24;
+    case 'custom': return 24;
+  }
+}
 
 export function ActivityFeed() {
-  const { filters, setHours, toggleProvider, setRepo } = useFeedFilters();
+  const {
+    filters,
+    setTimeRange,
+    toggleIntegration,
+    toggleEventType,
+    removeIntegration,
+    removeEventType,
+    clearAll,
+    hasActiveFilters,
+  } = useFilters();
+
+  const feedFilters = {
+    hours: timeRangeToHours(filters.timeRange),
+    providers: filters.integrations as ActivityProvider[],
+    eventTypes: filters.eventTypes,
+  };
 
   const {
     data,
@@ -18,19 +44,21 @@ export function ActivityFeed() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useFeed(filters);
+  } = useFeed(feedFilters);
 
   const allItems = data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
     <section aria-label="Activity feed">
-      <FeedFilterBar
-        hours={filters.hours}
-        providers={filters.providers}
-        repo={filters.repo}
-        onHoursChange={setHours}
-        onProviderToggle={toggleProvider}
-        onRepoChange={setRepo}
+      <FilterBar
+        filters={filters}
+        onTimeRangeChange={setTimeRange}
+        onIntegrationToggle={toggleIntegration}
+        onEventTypeToggle={toggleEventType}
+        onRemoveIntegration={removeIntegration}
+        onRemoveEventType={removeEventType}
+        onClearAll={clearAll}
+        hasActiveFilters={hasActiveFilters}
       />
 
       {isLoading && <ActivityFeedSkeleton />}
@@ -40,7 +68,7 @@ export function ActivityFeed() {
       )}
 
       {!isLoading && !isError && allItems.length === 0 && (
-        <EmptyState hours={filters.hours} />
+        <EmptyState hours={feedFilters.hours} />
       )}
 
       {!isLoading && !isError && allItems.length > 0 && (
@@ -48,7 +76,7 @@ export function ActivityFeed() {
           <div
             className="activity-feed"
             role="feed"
-            aria-label={`Activity from the last ${filters.hours} hours`}
+            aria-label={`Activity from the last ${feedFilters.hours} hours`}
             aria-busy={isFetchingNextPage}
           >
             {allItems.map((activity) => (

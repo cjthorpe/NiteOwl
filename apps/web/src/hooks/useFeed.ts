@@ -1,15 +1,22 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { fetchFeedPage } from '../lib/feed';
-import type { FeedFilters } from './useFeedFilters';
+import type { ActivityProvider } from '@niteowl/types';
+import type { EventType } from '../types/filters';
 
-export function useFeed(filters: FeedFilters) {
+export interface FeedQueryFilters {
+  hours: number;
+  providers: ActivityProvider[];
+  eventTypes: EventType[];
+}
+
+export function useFeed(filters: FeedQueryFilters) {
   return useInfiniteQuery({
     queryKey: ['feed', filters],
     queryFn: ({ pageParam }) =>
       fetchFeedPage({
         hours: filters.hours,
         providers: filters.providers,
-        repo: filters.repo,
+        eventTypes: filters.eventTypes,
         page: pageParam,
       }),
     initialPageParam: 1,
