@@ -1,14 +1,15 @@
 /**
- * Slack Alert Config routes (FUL-26)
+ * Slack Alert Config routes (FUL-34)
  *
  * Manages per-user Slack Incoming Webhook configurations that fire digest
- * alerts when a PR is merged to a watched branch.
+ * alerts when a PR is merged to a watched branch by a known bot/agent user.
  *
  * Endpoints:
  *   GET    /api/slack-alerts          — list all configs for the authed user
  *   POST   /api/slack-alerts          — create a new config
- *   PATCH  /api/slack-alerts/:id      — update watchedRepos / enabled / webhookUrl
+ *   PATCH  /api/slack-alerts/:id      — update watchedRepos / botUserLogins / enabled / webhookUrl
  *   DELETE /api/slack-alerts/:id      — remove a config
+ *   POST   /api/slack-alerts/:id/test — send a test Slack message
  */
 
 import { and, eq } from "drizzle-orm";
@@ -18,6 +19,10 @@ import type { Db } from "@niteowl/db";
 import { encrypt, decrypt, schema } from "@niteowl/db";
 
 import { requireAuth } from "../../plugins/auth.js";
+import {
+  formatPrMergeAlert,
+  sendSlackAlert,
+} from "../../lib/slack-alert.js";
 
 // ---------------------------------------------------------------------------
 // Request body types
@@ -28,11 +33,17 @@ interface CreateBody {
   webhookUrl: string;
   /** Repo full-names to watch, e.g. ["owner/repo"] */
   watchedRepos?: string[];
+  /**
+   * GitHub logins treated as bot/agent mergers.
+   * When non-empty, alerts only fire when the PR sender is in this list.
+   */
+  botUserLogins?: string[];
 }
 
 interface UpdateBody {
   webhookUrl?: string;
   watchedRepos?: string[];
+  botUserLogins?: string[];
   enabled?: boolean;
 }
 
@@ -50,6 +61,13 @@ function validateWatchedRepos(repos: unknown): repos is string[] {
   if (!Array.isArray(repos)) return false;
   return repos.every(
     (r) => typeof r === "string" && r.includes("/") && r.length <= 200,
+  );
+}
+
+function validateBotUserLogins(logins: unknown): logins is string[] {
+  if (!Array.isArray(logins)) return false;
+  return logins.every(
+    (l) => typeof l === "string" && l.length > 0 && l.length <= 200,
   );
 }
 
@@ -72,6 +90,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
       .select({
         id: schema.slackAlertConfigs.id,
         watchedRepos: schema.slackAlertConfigs.watchedRepos,
+        botUserLogins: schema.slackAlertConfigs.botUserLogins,
         enabled: schema.slackAlertConfigs.enabled,
         createdAt: schema.slackAlertConfigs.createdAt,
         updatedAt: schema.slackAlertConfigs.updatedAt,
@@ -79,7 +98,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
       .from(schema.slackAlertConfigs)
       .where(eq(schema.slackAlertConfigs.userId, userId))
       .orderBy(schema.slackAlertConfigs.createdAt)
-      .limit(20); // a user is unlikely to need more than 20 Slack configs
+      .limit(20);
 
     return reply.code(200).send({ configs: rows });
   });
@@ -107,6 +126,13 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         });
       }
 
+      const botUserLogins = body.botUserLogins ?? [];
+      if (!validateBotUserLogins(botUserLogins)) {
+        return reply.code(400).send({
+          error: "botUserLogins must be an array of non-empty GitHub login strings",
+        });
+      }
+
       const webhookUrlEncrypted = encrypt(body.webhookUrl);
 
       const [created] = await db
@@ -115,11 +141,13 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
           userId,
           webhookUrlEncrypted,
           watchedRepos,
+          botUserLogins,
           enabled: true,
         })
         .returning({
           id: schema.slackAlertConfigs.id,
           watchedRepos: schema.slackAlertConfigs.watchedRepos,
+          botUserLogins: schema.slackAlertConfigs.botUserLogins,
           enabled: schema.slackAlertConfigs.enabled,
           createdAt: schema.slackAlertConfigs.createdAt,
           updatedAt: schema.slackAlertConfigs.updatedAt,
@@ -142,6 +170,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
       const updates: Partial<{
         webhookUrlEncrypted: string;
         watchedRepos: string[];
+        botUserLogins: string[];
         enabled: boolean;
         updatedAt: Date;
       }> = { updatedAt: new Date() };
@@ -165,6 +194,15 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         updates.watchedRepos = body.watchedRepos;
       }
 
+      if (body.botUserLogins !== undefined) {
+        if (!validateBotUserLogins(body.botUserLogins)) {
+          return reply.code(400).send({
+            error: "botUserLogins must be an array of non-empty GitHub login strings",
+          });
+        }
+        updates.botUserLogins = body.botUserLogins;
+      }
+
       if (body.enabled !== undefined) {
         if (typeof body.enabled !== "boolean") {
           return reply
@@ -186,6 +224,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .returning({
           id: schema.slackAlertConfigs.id,
           watchedRepos: schema.slackAlertConfigs.watchedRepos,
+          botUserLogins: schema.slackAlertConfigs.botUserLogins,
           enabled: schema.slackAlertConfigs.enabled,
           createdAt: schema.slackAlertConfigs.createdAt,
           updatedAt: schema.slackAlertConfigs.updatedAt,
@@ -225,6 +264,56 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
       return reply.code(204).send();
     },
   );
+
+  // ── POST /api/slack-alerts/:id/test ───────────────────────────────────────
+
+  fastify.post<{ Params: { id: string } }>(
+    "/:id/test",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const userId = request.user!.sub;
+      const { id } = request.params;
+
+      const [config] = await db
+        .select({
+          webhookUrlEncrypted: schema.slackAlertConfigs.webhookUrlEncrypted,
+          enabled: schema.slackAlertConfigs.enabled,
+        })
+        .from(schema.slackAlertConfigs)
+        .where(
+          and(
+            eq(schema.slackAlertConfigs.id, id),
+            eq(schema.slackAlertConfigs.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (!config) {
+        return reply.code(404).send({ error: "Slack alert config not found" });
+      }
+
+      const webhookUrl = decrypt(config.webhookUrlEncrypted);
+
+      const testMessage = formatPrMergeAlert({
+        repo: "your-org/example-repo",
+        prNumber: 0,
+        prTitle: "NiteOwl test message — alerts are working!",
+        author: "niteowl-bot",
+        url: "https://github.com",
+        baseBranch: "main",
+        occurredAt: new Date().toISOString(),
+      });
+
+      try {
+        const result = await sendSlackAlert(webhookUrl, testMessage);
+        return reply.code(200).send({ ok: true, attempts: result.attempts });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Slack delivery failed";
+        return reply.code(502).send({ error: message });
+      }
+    },
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -233,17 +322,25 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
 /**
  * Retrieves all enabled Slack alert configs for a user and decrypts webhook URLs.
- * Used by the normalization worker to fire alerts after a PR merge.
+ * Used by the normalization worker to dispatch slack-alert BullMQ jobs.
  */
 export async function getEnabledAlertsForUser(
   db: Db,
   userId: string,
-): Promise<Array<{ id: string; webhookUrl: string; watchedRepos: string[] }>> {
+): Promise<
+  Array<{
+    id: string;
+    webhookUrl: string;
+    watchedRepos: string[];
+    botUserLogins: string[];
+  }>
+> {
   const rows = await db
     .select({
       id: schema.slackAlertConfigs.id,
       webhookUrlEncrypted: schema.slackAlertConfigs.webhookUrlEncrypted,
       watchedRepos: schema.slackAlertConfigs.watchedRepos,
+      botUserLogins: schema.slackAlertConfigs.botUserLogins,
     })
     .from(schema.slackAlertConfigs)
     .where(
@@ -257,5 +354,6 @@ export async function getEnabledAlertsForUser(
     id: r.id,
     webhookUrl: decrypt(r.webhookUrlEncrypted),
     watchedRepos: r.watchedRepos,
+    botUserLogins: r.botUserLogins,
   }));
 }

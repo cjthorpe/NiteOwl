@@ -73,3 +73,19 @@ export interface NormalizationJobData {
   integrationId: string;
   payload: Record<string, unknown>;
 }
+
+/** Raw BullMQ job data for the slack-alert queue (FUL-34) */
+export interface SlackAlertJobData {
+  /** The slack_alert_configs row to use — looked up fresh on each attempt so config changes / deletions are respected */
+  configId: string;
+  userId: string;
+  alertData: {
+    repo: string;
+    prNumber: number;
+    prTitle: string;
+    author: string;
+    url: string;
+    baseBranch: string;
+    occurredAt: string; // ISO 8601
+  };
+}

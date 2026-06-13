@@ -3,11 +3,15 @@ import type { FastifyPluginAsync } from "fastify";
 import { Queue } from "bullmq";
 
 import type { Db } from "@niteowl/db";
-import type { NormalizationJobData } from "@niteowl/types";
+import type { NormalizationJobData, SlackAlertJobData } from "@niteowl/types";
 import {
   NORMALIZATION_QUEUE,
   createNormalizationWorker,
 } from "../workers/normalization.worker.js";
+import {
+  SLACK_ALERT_QUEUE,
+  createSlackAlertWorker,
+} from "../workers/slack-alert.worker.js";
 
 // ---------------------------------------------------------------------------
 // Fastify type augmentation
@@ -16,6 +20,7 @@ import {
 declare module "fastify" {
   interface FastifyInstance {
     normalizationQueue: Queue<NormalizationJobData> | null;
+    slackAlertQueue: Queue<SlackAlertJobData> | null;
   }
 }
 
@@ -44,16 +49,22 @@ export interface QueuePluginOptions {
 }
 
 /**
- * Registers the BullMQ normalization queue and starts the worker.
+ * Registers the BullMQ normalization queue + Slack-alert queue and starts
+ * their respective workers.
  *
- * Default job options:
+ * Normalization queue defaults:
  *  - 5 attempts with exponential back-off (1 s → 2 s → 4 s → 8 s → 16 s)
  *  - Completed jobs retained for the last 1 000 entries (audit log)
  *  - Failed jobs retained for the last 5 000 entries (dead-letter store)
  *
- * The queue is exposed on fastify.normalizationQueue. A null value indicates
- * that Redis was unavailable at startup — webhook handlers must treat this
- * gracefully (log + continue without enqueueing).
+ * Slack-alert queue defaults (FUL-34):
+ *  - 4 attempts (1 initial + 3 retries)
+ *  - Fixed 60-second delay between each retry
+ *  - Completed jobs retained for the last 500 entries
+ *  - Failed jobs retained for the last 1 000 entries
+ *
+ * Both queues are exposed on the Fastify instance. A null value indicates that
+ * Redis was unavailable at startup — handlers must treat this gracefully.
  */
 const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
   fastify,
@@ -63,43 +74,69 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
     process.env["REDIS_URL"] ?? "redis://localhost:6379";
   const redisOptions = parseRedisUrl(redisUrl);
 
-  // defaultJobOptions applies to every job added via queue.add().
-  // Retry logic: exponential back-off with a base delay of 1 s,
-  // doubling each attempt up to the 5th (max ~16 s on the last retry).
-  const jobDefaults = {
+  // ── Normalization queue ───────────────────────────────────────────────────
+  const normalizationJobDefaults = {
     attempts: 5,
     backoff: {
       type: "exponential" as const,
       delay: 1000,
     },
-    // Keep completed jobs for observability (not strictly required).
     removeOnComplete: { count: 1000 },
-    // Dead-letter store: retain the last 5 000 permanently-failed jobs.
-    // Bull Board / any BullMQ dashboard can inspect these.
     removeOnFail: { count: 5000 },
   };
 
-  // BullMQ connects lazily — the Queue and Worker are created without
-  // blocking on a Redis connection. If Redis is down when the first job is
-  // added, queue.add() will throw and the webhook handler logs + continues.
-  const queue = new Queue<NormalizationJobData>(NORMALIZATION_QUEUE, {
+  const normalizationQueue = new Queue<NormalizationJobData>(
+    NORMALIZATION_QUEUE,
+    {
+      connection: redisOptions,
+      defaultJobOptions: normalizationJobDefaults,
+    },
+  );
+
+  // ── Slack-alert queue (FUL-34) ────────────────────────────────────────────
+  // 3 retries with a fixed 60-second delay between each attempt so transient
+  // Slack outages (< 3 min) are automatically recovered.
+  const slackAlertJobDefaults = {
+    attempts: 4, // 1 initial + 3 retries
+    backoff: {
+      type: "fixed" as const,
+      delay: 60_000, // 1 minute
+    },
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 1000 },
+  };
+
+  const slackAlertQueue = new Queue<SlackAlertJobData>(SLACK_ALERT_QUEUE, {
     connection: redisOptions,
-    defaultJobOptions: jobDefaults,
+    defaultJobOptions: slackAlertJobDefaults,
   });
 
-  const worker = createNormalizationWorker(db, redisOptions);
+  // ── Workers ───────────────────────────────────────────────────────────────
+
+  const normalizationWorker = createNormalizationWorker(
+    db,
+    redisOptions,
+    slackAlertQueue,
+  );
+
+  const slackAlertWorker = createSlackAlertWorker(db, redisOptions);
+
+  // ── Graceful shutdown ─────────────────────────────────────────────────────
 
   fastify.addHook("onClose", async () => {
-    await worker.close().catch(() => undefined);
-    await queue.close().catch(() => undefined);
+    await slackAlertWorker.close().catch(() => undefined);
+    await normalizationWorker.close().catch(() => undefined);
+    await slackAlertQueue.close().catch(() => undefined);
+    await normalizationQueue.close().catch(() => undefined);
   });
 
   fastify.log.info(
     { host: redisOptions.host, port: redisOptions.port },
-    "BullMQ normalization queue registered",
+    "BullMQ normalization + slack-alert queues registered",
   );
 
-  fastify.decorate("normalizationQueue", queue);
+  fastify.decorate("normalizationQueue", normalizationQueue);
+  fastify.decorate("slackAlertQueue", slackAlertQueue);
 };
 
 export default fp(queuePlugin, { name: "queue", dependencies: [] });

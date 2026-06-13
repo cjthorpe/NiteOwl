@@ -158,6 +158,12 @@ export const slackAlertConfigs = pgTable("slack_alert_configs", {
   webhookUrlEncrypted: text("webhook_url_encrypted").notNull(),
   /** Repo full-names to watch, e.g. ["owner/repo", "org/another"] */
   watchedRepos: text("watched_repos").array().notNull().default([]),
+  /**
+   * GitHub logins considered "bot/agent" mergers.
+   * When non-empty, alerts only fire when the PR sender login is in this list.
+   * An empty array means "alert on all merges regardless of who merged".
+   */
+  botUserLogins: text("bot_user_logins").array().notNull().default([]),
   /** Whether alerts are active — can be toggled independently of feed integrations */
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })

@@ -1,14 +1,10 @@
 import { Worker } from "bullmq";
+import type { Queue } from "bullmq";
 import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
-import type { Activity, NormalizationJobData } from "@niteowl/types";
+import type { Activity, NormalizationJobData, SlackAlertJobData } from "@niteowl/types";
 import { normalizeEvent } from "../normalizers/index.js";
 import { invalidateFeedCache } from "../routes/feed/index.js";
-import {
-  formatPrMergeAlert,
-  sendSlackAlert,
-  type PrMergeAlertData,
-} from "../lib/slack-alert.js";
 import { getEnabledAlertsForUser } from "../routes/slack-alerts/index.js";
 
 export const NORMALIZATION_QUEUE = "normalization";
@@ -47,14 +43,21 @@ function activityToRow(
  *  1. Routes the payload to the correct normalizer.
  *  2. Inserts the canonical ActivityEvent into the `activity_events` table.
  *  3. Invalidates the per-user feed cache so the new event appears within 5s.
- *  4. Skips (logs + ignores) unrecognised event types.
+ *  4. For GitHub PR merges, enqueues slack-alert jobs for matching configs.
+ *  5. Skips (logs + ignores) unrecognised event types.
  *
  * Duplicate inserts are silently dropped via the unique constraint on
  * (integration_id, external_id).
+ *
+ * @param db               - Drizzle DB client.
+ * @param redisOptions     - Redis connection options.
+ * @param slackAlertQueue  - Optional queue for outbound Slack alerts (FUL-34).
+ *                          When null, Slack alerts are silently skipped (e.g. test mode).
  */
 export function createNormalizationWorker(
   db: Db,
   redisOptions: { host: string; port: number },
+  slackAlertQueue: Queue<SlackAlertJobData> | null = null,
 ): Worker<NormalizationJobData> {
   const worker = new Worker<NormalizationJobData>(
     NORMALIZATION_QUEUE,
@@ -87,14 +90,20 @@ export function createNormalizationWorker(
         `[normalization-worker] Inserted activity ${activity.id} (${provider}:${activity.eventType})`,
       );
 
-      // ── Slack alerts — fire for PR merge events on GitHub ────────────────
-      if (provider === "github" && activity.eventType === "pr_merged") {
-        void fireSlackAlerts(db, activity).catch((err: unknown) => {
-          console.warn(
-            `[normalization-worker] Slack alert dispatch failed for activity ${activity.id}`,
-            err,
-          );
-        });
+      // ── Slack alerts — enqueue for PR merge events on GitHub ─────────────
+      if (
+        provider === "github" &&
+        activity.eventType === "pr_merged" &&
+        slackAlertQueue !== null
+      ) {
+        void enqueueSlackAlerts(db, activity, slackAlertQueue).catch(
+          (err: unknown) => {
+            console.warn(
+              `[normalization-worker] Slack alert enqueue failed for activity ${activity.id}`,
+              err,
+            );
+          },
+        );
       }
 
       // Invalidate per-user feed cache so the new event surfaces within 5s.
@@ -130,23 +139,36 @@ export function createNormalizationWorker(
 }
 
 // ---------------------------------------------------------------------------
-// Slack alert dispatch
+// Slack alert dispatch — enqueue per-config jobs
 // ---------------------------------------------------------------------------
 
 /**
- * Queries all enabled Slack alert configs for the activity owner and sends
- * an alert to every webhook whose watchedRepos list includes the PR's repo.
+ * Resolves all enabled Slack alert configs for the activity owner, applies
+ * watchedRepos and botUserLogins filters, then enqueues one slack-alert BullMQ
+ * job per matching config.
  *
- * Failures per-webhook are logged but do not propagate — one bad webhook
- * must not prevent others from firing.
+ * Filter logic:
+ *   watchedRepos  — if non-empty, the PR's repo must be in the list (case-insensitive)
+ *   botUserLogins — if non-empty, the PR's sender login must be in the list (case-insensitive)
+ *
+ * Each job is independently retried by BullMQ (3 retries, 60-second delay).
  */
-async function fireSlackAlerts(db: Db, activity: Activity): Promise<void> {
+async function enqueueSlackAlerts(
+  db: Db,
+  activity: Activity,
+  queue: Queue<SlackAlertJobData>,
+): Promise<void> {
   const meta = activity.metadata as Record<string, unknown>;
   const repo = typeof meta["repo"] === "string" ? meta["repo"] : null;
   const prNumber =
     typeof meta["prNumber"] === "number" ? meta["prNumber"] : 0;
+  // `author` = PR creator login; `sender` = who triggered the merge action
+  const sender =
+    typeof meta["sender"] === "string" ? meta["sender"] : null;
   const author =
     typeof meta["author"] === "string" ? meta["author"] : "unknown";
+  const baseBranch =
+    typeof meta["baseBranch"] === "string" ? meta["baseBranch"] : "main";
 
   if (!repo) {
     console.warn(
@@ -155,14 +177,14 @@ async function fireSlackAlerts(db: Db, activity: Activity): Promise<void> {
     return;
   }
 
-  // Extract base branch from PR title pattern "[owner/repo] PR #N: ..." or metadata
-  const baseBranch =
-    typeof meta["baseBranch"] === "string" ? meta["baseBranch"] : "main";
+  const mergerLogin = sender ?? author; // fall back to author if sender absent
 
-  const alertData: PrMergeAlertData = {
+  const alertData: SlackAlertJobData["alertData"] = {
     repo,
     prNumber,
-    prTitle: activity.title.replace(/^\[.*?\]\s*PR #\d+:\s*/, "").trim() || activity.title,
+    prTitle:
+      activity.title.replace(/^\[.*?\]\s*PR #\d+:\s*/, "").trim() ||
+      activity.title,
     author,
     url: activity.url ?? `https://github.com/${repo}`,
     baseBranch,
@@ -170,31 +192,53 @@ async function fireSlackAlerts(db: Db, activity: Activity): Promise<void> {
   };
 
   const configs = await getEnabledAlertsForUser(db, activity.userId);
-  const matchingConfigs = configs.filter(
-    (c) =>
-      c.watchedRepos.length === 0 ||
-      c.watchedRepos.some(
+
+  const matchingConfigs = configs.filter((c) => {
+    // watchedRepos filter: empty means "all repos"
+    if (
+      c.watchedRepos.length > 0 &&
+      !c.watchedRepos.some(
         (watched) => watched.toLowerCase() === repo.toLowerCase(),
-      ),
-  );
+      )
+    ) {
+      return false;
+    }
+
+    // botUserLogins filter: empty means "all mergers"
+    if (
+      c.botUserLogins.length > 0 &&
+      !c.botUserLogins.some(
+        (login) => login.toLowerCase() === mergerLogin.toLowerCase(),
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
 
   if (matchingConfigs.length === 0) return;
 
-  const message = formatPrMergeAlert(alertData);
-
-  await Promise.allSettled(
-    matchingConfigs.map(async (config) => {
-      try {
-        const result = await sendSlackAlert(config.webhookUrl, message);
-        console.info(
-          `[normalization-worker] Slack alert sent to config ${config.id} after ${result.attempts} attempt(s)`,
-        );
-      } catch (err) {
-        console.error(
-          `[normalization-worker] Slack alert failed for config ${config.id}`,
-          err,
-        );
-      }
-    }),
+  await Promise.all(
+    matchingConfigs.map((config) =>
+      queue
+        .add(
+          "send-pr-merge-alert",
+          { configId: config.id, userId: activity.userId, alertData },
+          // Job-level options override queue defaults when needed — here we
+          // rely entirely on the queue's defaultJobOptions (4 attempts, 60s delay).
+        )
+        .then((job) => {
+          console.info(
+            `[normalization-worker] Enqueued slack-alert job ${job.id ?? ""} for config ${config.id}`,
+          );
+        })
+        .catch((err: unknown) => {
+          console.error(
+            `[normalization-worker] Failed to enqueue slack-alert for config ${config.id}`,
+            err,
+          );
+        }),
+    ),
   );
 }
