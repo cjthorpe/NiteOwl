@@ -59,6 +59,8 @@ export interface Activity {
   url: string;
   /** Arbitrary provider-specific payload fields */
   metadata: Record<string, unknown>;
+  /** Agent login extracted at ingestion time (FUL-58) */
+  authorLogin?: string | null;
   /** When the event occurred according to the provider */
   occurredAt: Timestamp;
   /** When we ingested the event */
