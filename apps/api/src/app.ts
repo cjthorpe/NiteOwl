@@ -5,7 +5,10 @@ import Fastify from "fastify";
 import type { HealthStatus } from "@niteowl/types";
 import { createDb } from "@niteowl/db";
 import authPlugin from "./plugins/auth.js";
+import redisPlugin from "./plugins/redis.js";
 import { authRoutes } from "./routes/auth/index.js";
+import { feedRoutes } from "./routes/feed/index.js";
+import { integrationsRoutes } from "./routes/integrations/index.js";
 
 export interface BuildAppOptions {
   /** Injected in tests; production uses DATABASE_URL env var */
@@ -56,6 +59,9 @@ export function buildApp(opts: BuildAppOptions = {}) {
   // ── Auth: JWT decode + request.user decoration ────────────────────────────
   app.register(authPlugin);
 
+  // ── Redis: caching layer ───────────────────────────────────────────────────
+  app.register(redisPlugin);
+
   // ── DB ─────────────────────────────────────────────────────────────────────
   const db =
     opts.db ??
@@ -99,6 +105,10 @@ export function buildApp(opts: BuildAppOptions = {}) {
 
   // Auth routes — stricter rate limits applied per-route via config.rateLimit
   app.register(authRoutes, { prefix: "/auth", db });
+
+  // Feed + integrations API
+  app.register(feedRoutes, { prefix: "/api/feed", db });
+  app.register(integrationsRoutes, { prefix: "/api/integrations", db });
 
   return app;
 }
