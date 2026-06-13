@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
-const ACCESS_TOKEN_TTL = "1h";
+const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL = "7d";
 const REFRESH_TOKEN_MS = 7 * 24 * 60 * 60 * 1000;
 
