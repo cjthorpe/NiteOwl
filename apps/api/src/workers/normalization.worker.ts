@@ -3,27 +3,38 @@ import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 import type { Activity, NormalizationJobData } from "@niteowl/types";
 import { normalizeEvent } from "../normalizers/index.js";
+import { invalidateFeedCache } from "../routes/feed/index.js";
+import {
+  formatPrMergeAlert,
+  sendSlackAlert,
+  type PrMergeAlertData,
+} from "../lib/slack-alert.js";
+import { getEnabledAlertsForUser } from "../routes/slack-alerts/index.js";
 
 export const NORMALIZATION_QUEUE = "normalization";
 
 /**
- * Maps a canonical Activity (from the normalizer layer) to a DB insert row.
- * The activities table omits `description` and stores metadata as `metadataJson`.
+ * Maps a canonical Activity (from the normalizer layer) to a DB insert row for
+ * the `activity_events` table.
+ *
+ * Field mapping:
+ *   Activity.sourceId   → activity_events.external_id  (provider-native dedup key)
+ *   Activity.metadata   → activity_events.metadata      (jsonb)
  */
 function activityToRow(
   activity: Activity,
-): typeof schema.activities.$inferInsert {
+  integrationId: string,
+): typeof schema.activityEvents.$inferInsert {
   return {
-    // Let the DB generate the UUID if we don't pass one — but we pass ours for
-    // determinism in tests.
     id: activity.id,
     userId: activity.userId,
+    integrationId,
     provider: activity.provider,
     eventType: activity.eventType,
-    sourceId: activity.sourceId,
+    externalId: activity.sourceId,
     title: activity.title,
-    url: activity.url,
-    metadataJson: activity.metadata,
+    url: activity.url ?? null,
+    metadata: activity.metadata,
     occurredAt: new Date(activity.occurredAt),
     ingestedAt: new Date(activity.ingestedAt),
   };
@@ -34,11 +45,12 @@ function activityToRow(
  *
  * Each job carries a {@link NormalizationJobData} payload. The worker:
  *  1. Routes the payload to the correct normalizer.
- *  2. Inserts the canonical Activity into the `activities` table.
- *  3. Skips (logs + ignores) unrecognised event types.
+ *  2. Inserts the canonical ActivityEvent into the `activity_events` table.
+ *  3. Invalidates the per-user feed cache so the new event appears within 5s.
+ *  4. Skips (logs + ignores) unrecognised event types.
  *
  * Duplicate inserts are silently dropped via the unique constraint on
- * (user_id, provider, source_id).
+ * (integration_id, external_id).
  */
 export function createNormalizationWorker(
   db: Db,
@@ -47,7 +59,7 @@ export function createNormalizationWorker(
   const worker = new Worker<NormalizationJobData>(
     NORMALIZATION_QUEUE,
     async (job) => {
-      const { provider, userId, payload } = job.data;
+      const { provider, userId, integrationId, payload } = job.data;
 
       const activity = normalizeEvent(provider, payload, userId);
 
@@ -59,22 +71,47 @@ export function createNormalizationWorker(
         return;
       }
 
-      const row = activityToRow(activity);
+      const row = activityToRow(activity, integrationId);
 
       await db
-        .insert(schema.activities)
+        .insert(schema.activityEvents)
         .values(row)
         .onConflictDoNothing({
           target: [
-            schema.activities.userId,
-            schema.activities.provider,
-            schema.activities.sourceId,
+            schema.activityEvents.integrationId,
+            schema.activityEvents.externalId,
           ],
         });
 
       console.info(
         `[normalization-worker] Inserted activity ${activity.id} (${provider}:${activity.eventType})`,
       );
+
+      // ── Slack alerts — fire for PR merge events on GitHub ────────────────
+      if (provider === "github" && activity.eventType === "pr_merged") {
+        void fireSlackAlerts(db, activity).catch((err: unknown) => {
+          console.warn(
+            `[normalization-worker] Slack alert dispatch failed for activity ${activity.id}`,
+            err,
+          );
+        });
+      }
+
+      // Invalidate per-user feed cache so the new event surfaces within 5s.
+      // We create a temporary ioredis client using the same connection options
+      // so the worker doesn't need a fastify instance reference.
+      try {
+        const { default: Redis } = await import("ioredis");
+        const redis = new Redis(redisOptions);
+        await invalidateFeedCache(redis, userId);
+        await redis.quit();
+      } catch (err) {
+        // Cache invalidation is best-effort — a failure here must not block ingestion.
+        console.warn(
+          `[normalization-worker] Cache invalidation failed for user ${userId}`,
+          err,
+        );
+      }
     },
     {
       connection: redisOptions,
@@ -90,4 +127,74 @@ export function createNormalizationWorker(
   });
 
   return worker;
+}
+
+// ---------------------------------------------------------------------------
+// Slack alert dispatch
+// ---------------------------------------------------------------------------
+
+/**
+ * Queries all enabled Slack alert configs for the activity owner and sends
+ * an alert to every webhook whose watchedRepos list includes the PR's repo.
+ *
+ * Failures per-webhook are logged but do not propagate — one bad webhook
+ * must not prevent others from firing.
+ */
+async function fireSlackAlerts(db: Db, activity: Activity): Promise<void> {
+  const meta = activity.metadata as Record<string, unknown>;
+  const repo = typeof meta["repo"] === "string" ? meta["repo"] : null;
+  const prNumber =
+    typeof meta["prNumber"] === "number" ? meta["prNumber"] : 0;
+  const author =
+    typeof meta["author"] === "string" ? meta["author"] : "unknown";
+
+  if (!repo) {
+    console.warn(
+      `[normalization-worker] PR merge activity ${activity.id} has no repo in metadata — skipping Slack alert`,
+    );
+    return;
+  }
+
+  // Extract base branch from PR title pattern "[owner/repo] PR #N: ..." or metadata
+  const baseBranch =
+    typeof meta["baseBranch"] === "string" ? meta["baseBranch"] : "main";
+
+  const alertData: PrMergeAlertData = {
+    repo,
+    prNumber,
+    prTitle: activity.title.replace(/^\[.*?\]\s*PR #\d+:\s*/, "").trim() || activity.title,
+    author,
+    url: activity.url ?? `https://github.com/${repo}`,
+    baseBranch,
+    occurredAt: activity.occurredAt,
+  };
+
+  const configs = await getEnabledAlertsForUser(db, activity.userId);
+  const matchingConfigs = configs.filter(
+    (c) =>
+      c.watchedRepos.length === 0 ||
+      c.watchedRepos.some(
+        (watched) => watched.toLowerCase() === repo.toLowerCase(),
+      ),
+  );
+
+  if (matchingConfigs.length === 0) return;
+
+  const message = formatPrMergeAlert(alertData);
+
+  await Promise.allSettled(
+    matchingConfigs.map(async (config) => {
+      try {
+        const result = await sendSlackAlert(config.webhookUrl, message);
+        console.info(
+          `[normalization-worker] Slack alert sent to config ${config.id} after ${result.attempts} attempt(s)`,
+        );
+      } catch (err) {
+        console.error(
+          `[normalization-worker] Slack alert failed for config ${config.id}`,
+          err,
+        );
+      }
+    }),
+  );
 }

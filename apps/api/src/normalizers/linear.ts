@@ -25,6 +25,26 @@ interface LinearIssuePayload {
   organizationId: string;
 }
 
+interface LinearCommentPayload {
+  action: string;
+  type: "Comment";
+  data: {
+    id: string;
+    body: string;
+    url: string;
+    createdAt: string;
+    updatedAt: string;
+    issue: {
+      id: string;
+      identifier: string;
+      title: string;
+      team: { name: string; key: string };
+    };
+    user?: { id: string; name: string; email: string } | null;
+  };
+  organizationId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Event type resolution
 // ---------------------------------------------------------------------------
@@ -44,28 +64,13 @@ function resolveLinearIssueEventType(
 }
 
 // ---------------------------------------------------------------------------
-// Public entry point
+// Issue normalizer
 // ---------------------------------------------------------------------------
 
-/**
- * Normalizes a raw Linear webhook payload into a unified Activity record.
- * Returns null for unrecognised or unactionable event types.
- */
-export function normalizeLinearEvent(
-  payload: Record<string, unknown>,
+function normalizeIssue(
+  typed: LinearIssuePayload,
   userId: string,
 ): Activity | null {
-  if (
-    typeof payload["type"] !== "string" ||
-    payload["type"] !== "Issue" ||
-    typeof payload["action"] !== "string" ||
-    payload["data"] == null ||
-    typeof payload["data"] !== "object"
-  ) {
-    return null;
-  }
-
-  const typed = payload as unknown as LinearIssuePayload;
   const { action, data } = typed;
   const stateType = data.state.type;
   const eventType = resolveLinearIssueEventType(action, stateType);
@@ -98,4 +103,82 @@ export function normalizeLinearEvent(
     occurredAt,
     ingestedAt: new Date().toISOString(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Comment normalizer
+// ---------------------------------------------------------------------------
+
+function normalizeComment(
+  typed: LinearCommentPayload,
+  userId: string,
+): Activity | null {
+  if (typed.action !== "create") return null;
+
+  const { data } = typed;
+  const { issue } = data;
+
+  // Guard: issue metadata is required to build a meaningful title
+  if (issue == null || issue.team == null) return null;
+
+  return {
+    id: crypto.randomUUID(),
+    userId,
+    provider: "linear",
+    eventType: "comment_created",
+    sourceId: `comment:${data.id}`,
+    title: `[${issue.team.key}] Comment on ${issue.identifier}: ${issue.title}`,
+    description: data.body,
+    url: data.url,
+    metadata: {
+      commentId: data.id,
+      issueId: issue.id,
+      identifier: issue.identifier,
+      teamKey: issue.team.key,
+      teamName: issue.team.name,
+      author: data.user?.name ?? null,
+      authorEmail: data.user?.email ?? null,
+      organizationId: typed.organizationId,
+    },
+    occurredAt: data.createdAt,
+    ingestedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalizes a raw Linear webhook payload into a unified Activity record.
+ * Returns null for unrecognised or unactionable event types.
+ *
+ * Handles:
+ *   - type: "Issue" — create / update / remove actions
+ *   - type: "Comment" — create action only
+ */
+export function normalizeLinearEvent(
+  payload: Record<string, unknown>,
+  userId: string,
+): Activity | null {
+  if (
+    typeof payload["type"] !== "string" ||
+    typeof payload["action"] !== "string" ||
+    payload["data"] == null ||
+    typeof payload["data"] !== "object"
+  ) {
+    return null;
+  }
+
+  const type = payload["type"];
+
+  if (type === "Issue") {
+    return normalizeIssue(payload as unknown as LinearIssuePayload, userId);
+  }
+
+  if (type === "Comment") {
+    return normalizeComment(payload as unknown as LinearCommentPayload, userId);
+  }
+
+  return null;
 }

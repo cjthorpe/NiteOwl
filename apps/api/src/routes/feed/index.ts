@@ -6,7 +6,7 @@ import { schema } from "@niteowl/db";
 
 import { requireAuth } from "../../plugins/auth.js";
 
-const CACHE_TTL_SECONDS = 300; // 5 minutes
+const CACHE_TTL_SECONDS = 60; // 1 minute — per FUL-22 spec
 const DEFAULT_HOURS = 8;
 const MAX_HOURS = 72;
 const PAGE_SIZE = 25;
@@ -14,6 +14,7 @@ const PAGE_SIZE = 25;
 interface FeedQuery {
   hours?: string;
   provider?: string;
+  eventType?: string;
   repo?: string;
   cursor?: string;
 }
@@ -52,11 +53,13 @@ function feedCacheKey(
   userId: string,
   hours: number,
   provider?: string,
+  eventType?: string,
   repo?: string,
   cursor?: string,
 ): string {
   const parts = [`feed:${userId}:${hours}`];
   if (provider) parts.push(`p:${provider}`);
+  if (eventType) parts.push(`et:${eventType}`);
   if (repo) parts.push(`r:${repo}`);
   if (cursor) parts.push(`c:${cursor}`);
   return parts.join(":");
@@ -102,10 +105,11 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
         ? DEFAULT_HOURS
         : Math.min(hoursRaw, MAX_HOURS);
       const provider = request.query.provider?.toLowerCase();
+      const eventType = request.query.eventType?.toLowerCase();
       const repo = request.query.repo?.toLowerCase();
       const cursorRaw = request.query.cursor;
 
-      const cacheKey = feedCacheKey(userId, hours, provider, repo, cursorRaw);
+      const cacheKey = feedCacheKey(userId, hours, provider, eventType, repo, cursorRaw);
 
       // ── Cache read ────────────────────────────────────────────────────────
       const redis = fastify.redis;
@@ -132,6 +136,18 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
             schema.activityEvents.provider,
             provider as (typeof validProviders)[number],
           ),
+        );
+      }
+
+      const validEventTypes = [
+        "pr_opened", "pr_merged", "pr_closed",
+        "commit_pushed",
+        "issue_opened", "issue_closed", "issue_updated",
+        "comment_created",
+      ] as const;
+      if (eventType && validEventTypes.includes(eventType as (typeof validEventTypes)[number])) {
+        conditions.push(
+          eq(schema.activityEvents.eventType, eventType),
         );
       }
 

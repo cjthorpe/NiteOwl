@@ -44,7 +44,8 @@ export type ActivityEventType =
   | "commit_pushed"
   | "issue_opened"
   | "issue_closed"
-  | "issue_updated";
+  | "issue_updated"
+  | "comment_created";
 
 export interface Activity {
   id: string;
@@ -68,5 +69,7 @@ export interface Activity {
 export interface NormalizationJobData {
   provider: ActivityProvider;
   userId: string;
+  /** The integration that triggered this event — used for DB deduplication */
+  integrationId: string;
   payload: Record<string, unknown>;
 }
