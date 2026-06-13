@@ -5,6 +5,7 @@ import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 
 import { requireAuth } from "../../plugins/auth.js";
+import { githubCatchupRoutes } from "./github-catchup-route.js";
 import { linearCatchupRoutes } from "./linear-catchup.js";
 
 // ---------------------------------------------------------------------------
@@ -135,4 +136,7 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
   // ── Linear-specific routes (catchup) ─────────────────────────────────────
   fastify.register(linearCatchupRoutes, opts);
+
+  // ── GitHub-specific routes (catchup) ─────────────────────────────────────
+  fastify.register(githubCatchupRoutes, opts);
 };
