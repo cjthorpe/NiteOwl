@@ -14,6 +14,7 @@ import { githubWebhookRoutes } from "./routes/webhooks/github.js";
 import { jiraWebhookRoutes } from "./routes/webhooks/jira.js";
 import { linearWebhookRoutes } from "./routes/webhooks/linear.js";
 import { slackAlertRoutes } from "./routes/slack-alerts/index.js";
+import { agentLoginRoutes } from "./routes/agent-logins/index.js";
 
 export interface BuildAppOptions {
   /** Injected in tests; production uses DATABASE_URL env var */
@@ -144,6 +145,9 @@ export function buildApp(opts: BuildAppOptions = {}) {
 
   // Slack alert configuration
   app.register(slackAlertRoutes, { prefix: "/api/slack-alerts", db });
+
+  // Agent login registry
+  app.register(agentLoginRoutes, { prefix: "/api/agent-logins", db });
 
   return app;
 }
