@@ -231,6 +231,13 @@ export const refreshTokens = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /**
+     * Set when this token is consumed (rotated). Non-null means the token was
+     * already used and has been superseded by a new one. If a non-null token
+     * arrives again within the expiry window it indicates theft — trigger the
+     * nuclear revocation path.
+     */
+    rotatedAt: timestamp("rotated_at", { withTimezone: true }),
   },
   (table) => [
     index("refresh_tokens_user_id_idx").on(table.userId),

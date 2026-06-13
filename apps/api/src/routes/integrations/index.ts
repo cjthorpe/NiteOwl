@@ -6,6 +6,7 @@ import { schema } from "@niteowl/db";
 
 import { requireAuth } from "../../plugins/auth.js";
 import { runGitHubCatchup } from "../../lib/github-catchup.js";
+import { linearCatchupRoutes } from "./linear-catchup.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -184,4 +185,7 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (
       return reply.code(200).send({ integrationId, status: "connected" });
     },
   );
+
+  // ── Linear-specific routes (catchup) ─────────────────────────────────────
+  fastify.register(linearCatchupRoutes, opts);
 };

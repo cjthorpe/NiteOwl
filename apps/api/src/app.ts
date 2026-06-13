@@ -10,6 +10,7 @@ import { authRoutes } from "./routes/auth/index.js";
 import { feedRoutes } from "./routes/feed/index.js";
 import { integrationsRoutes } from "./routes/integrations/index.js";
 import { githubWebhookRoutes } from "./routes/webhooks/github.js";
+import { linearWebhookRoutes } from "./routes/webhooks/linear.js";
 import { slackAlertRoutes } from "./routes/slack-alerts/index.js";
 
 export interface BuildAppOptions {
@@ -114,6 +115,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
 
   // Webhook receivers — no auth, secured by provider-specific signatures
   app.register(githubWebhookRoutes, { prefix: "/api/webhooks/github", db });
+  app.register(linearWebhookRoutes, { prefix: "/api/webhooks", db });
 
   // Slack alert configuration
   app.register(slackAlertRoutes, { prefix: "/api/slack-alerts", db });
