@@ -53,6 +53,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       const passwordHash = await hashPassword(password);
 
+      // New users have no previous session — lastSeenAt will be null in the JWT.
       const [user] = await db
         .insert(schema.users)
         .values({ email, displayName, passwordHash })
@@ -60,7 +61,14 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       if (!user) throw new Error("Failed to create user");
 
-      const accessToken = await signAccessToken(user.id, user.email);
+      // Stamp last_seen_at = now (marks session open; next login will snapshot this).
+      await db
+        .update(schema.users)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(schema.users.id, user.id));
+
+      // lastSeenAt in the JWT is null for brand-new users (no prior session).
+      const accessToken = await signAccessToken(user.id, user.email, null);
       const { token: rawRefresh, expiresAt } = await signRefreshToken(
         user.id,
         user.email,
@@ -108,6 +116,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           id: schema.users.id,
           email: schema.users.email,
           passwordHash: schema.users.passwordHash,
+          lastSeenAt: schema.users.lastSeenAt,
         })
         .from(schema.users)
         .where(eq(schema.users.email, email))
@@ -126,7 +135,16 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           .send({ success: false, error: "Invalid credentials" });
       }
 
-      const accessToken = await signAccessToken(user.id, user.email);
+      // Snapshot the current last_seen_at into the JWT before overwriting it.
+      // This lets the feed ?since=last_login window reflect the previous session
+      // without collapsing to zero on page refresh within the same session.
+      const snapshotLastSeenAt = user.lastSeenAt;
+      await db
+        .update(schema.users)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(schema.users.id, user.id));
+
+      const accessToken = await signAccessToken(user.id, user.email, snapshotLastSeenAt);
       const { token: rawRefresh, expiresAt } = await signRefreshToken(
         user.id,
         user.email,

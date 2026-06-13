@@ -81,7 +81,7 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
       }
 
       const [user] = await db
-        .select({ id: schema.users.id, email: schema.users.email })
+        .select({ id: schema.users.id, email: schema.users.email, lastSeenAt: schema.users.lastSeenAt })
         .from(schema.users)
         .where(eq(schema.users.id, stored.userId))
         .limit(1);
@@ -113,7 +113,16 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
         expires: newExpiresAt,
       });
 
-      const accessToken = await signAccessToken(user.id, user.email);
+      // Snapshot the current last_seen_at into the new access token, then
+      // advance last_seen_at to now. Consumers that call ?since=last_login on
+      // the feed see the window from the previous session start.
+      const snapshotLastSeenAt = user.lastSeenAt;
+      await db
+        .update(schema.users)
+        .set({ lastSeenAt: now })
+        .where(eq(schema.users.id, user.id));
+
+      const accessToken = await signAccessToken(user.id, user.email, snapshotLastSeenAt);
 
       return reply.send({
         success: true,

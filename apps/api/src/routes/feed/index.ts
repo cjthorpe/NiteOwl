@@ -13,6 +13,12 @@ const PAGE_SIZE = 25;
 
 interface FeedQuery {
   hours?: string;
+  /**
+   * Pass `since=last_login` as a shorthand to resolve the start of the feed
+   * window to the user's previous session timestamp (from the JWT).  Falls
+   * back to DEFAULT_HOURS when the token has no lastSeenAt (first-ever session).
+   */
+  since?: string;
   provider?: string;
   eventType?: string;
   repo?: string;
@@ -103,17 +109,43 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.user!.sub;
-      const hoursRaw = parseInt(request.query.hours ?? String(DEFAULT_HOURS), 10);
-      const hours = Number.isNaN(hoursRaw) || hoursRaw < 1
-        ? DEFAULT_HOURS
-        : Math.min(hoursRaw, MAX_HOURS);
+
+      // ── Resolve the feed window start time ────────────────────────────────
+      // `?since=last_login` resolves to the user's previous session timestamp
+      // (snapshotted in the JWT at login). All other cases use `?hours`.
+      let since: Date;
+      let hours: number;
+      if (request.query.since === "last_login") {
+        const jwtLastSeenAt = request.user!.lastSeenAt;
+        if (jwtLastSeenAt) {
+          since = new Date(jwtLastSeenAt);
+          hours = Math.ceil((Date.now() - since.getTime()) / (60 * 60 * 1000));
+        } else {
+          // First-ever session — fall back to the default window
+          hours = DEFAULT_HOURS;
+          since = new Date(Date.now() - hours * 60 * 60 * 1000);
+        }
+      } else {
+        const hoursRaw = parseInt(request.query.hours ?? String(DEFAULT_HOURS), 10);
+        hours = Number.isNaN(hoursRaw) || hoursRaw < 1
+          ? DEFAULT_HOURS
+          : Math.min(hoursRaw, MAX_HOURS);
+        since = new Date(Date.now() - hours * 60 * 60 * 1000);
+      }
+
       const provider = request.query.provider?.toLowerCase();
       const eventType = request.query.eventType?.toLowerCase();
       const repo = request.query.repo?.toLowerCase();
       const author = request.query.author?.trim() || undefined;
       const cursorRaw = request.query.cursor;
+      // For cache-key purposes, encode `since=last_login` as the resolved ISO
+      // timestamp so two users with different lastSeenAt values never share a
+      // cache slot.
+      const sinceKey = request.query.since === "last_login"
+        ? `sl:${since.toISOString()}`
+        : undefined;
 
-      const cacheKey = feedCacheKey(userId, hours, provider, eventType, repo, author, cursorRaw);
+      const cacheKey = feedCacheKey(userId, hours, provider, eventType, repo, author, sinceKey ?? cursorRaw);
 
       // ── Cache read ────────────────────────────────────────────────────────
       const redis = fastify.redis;
@@ -124,9 +156,6 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
           return reply.code(200).send(JSON.parse(cached));
         }
       }
-
-      // ── Build query ───────────────────────────────────────────────────────
-      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
       const conditions: ReturnType<typeof eq>[] = [
         eq(schema.activityEvents.userId, userId),
