@@ -109,7 +109,6 @@ async function seed(): Promise<void> {
           userId: user.id,
           provider,
           configJson: { autoSync: true, webhooksEnabled: true },
-          encryptedSecret: fakeEncrypted(`webhook-secret-${provider}-${user.id}`),
           enabled: true,
           connectedAt: daysAgo(60),
           lastSyncedAt: daysAgo(1),
