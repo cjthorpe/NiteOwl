@@ -1,3 +1,5 @@
+import { ActivityFeed } from '../components/activity-feed/ActivityFeed';
+
 export function Dashboard() {
   return (
     <section aria-labelledby="dashboard-heading">
@@ -14,9 +16,7 @@ export function Dashboard() {
         Dashboard
       </h1>
 
-      <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-        Activity feed coming soon.
-      </p>
+      <ActivityFeed />
     </section>
   );
 }

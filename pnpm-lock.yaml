@@ -71,6 +71,9 @@ importers:
       bullmq:
         specifier: ^5.13.0
         version: 5.78.0
+      drizzle-orm:
+        specifier: ^0.41.0
+        version: 0.41.0(gel@2.2.0)(postgres@3.4.9)
       fastify:
         specifier: ^4.28.0
         version: 4.29.1
@@ -105,6 +108,9 @@ importers:
       '@niteowl/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@niteowl/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@tanstack/react-query':
         specifier: ^5.101.0
         version: 5.101.0(react@18.3.1)
@@ -167,6 +173,9 @@ importers:
         specifier: ^3.4.5
         version: 3.4.9
     devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
       drizzle-kit:
         specifier: ^0.30.0
         version: 0.30.6

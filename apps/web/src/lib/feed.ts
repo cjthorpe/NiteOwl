@@ -1,8 +1,7 @@
 import type { Activity, ActivityProvider } from '@niteowl/types';
 
-const API_URL =
-  (import.meta as Record<string, unknown> & { env: Record<string, string> }).env
-    .VITE_API_URL ?? 'http://localhost:3001';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
 export interface FeedParams {
   hours: number;

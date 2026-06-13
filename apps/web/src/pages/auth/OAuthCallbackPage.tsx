@@ -81,7 +81,7 @@ export function OAuthCallbackPage() {
         {callbackStatus === 'error' && (
           <ErrorState
             message={errorMessage ?? 'Something went wrong.'}
-            provider={isValidProvider(provider) ? provider : undefined}
+            {...(isValidProvider(provider) ? { provider } : {})}
             onRetry={() => navigate('/onboarding')}
           />
         )}

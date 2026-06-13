@@ -40,7 +40,7 @@ function IconSettings() {
 
 const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: IconDashboard },
-  { to: '/integrations', label: 'Integrations', icon: IconIntegrations },
+  { to: '/settings/integrations', label: 'Integrations', icon: IconIntegrations },
   { to: '/settings', label: 'Settings', icon: IconSettings },
 ];
 

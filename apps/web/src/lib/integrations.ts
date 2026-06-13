@@ -49,7 +49,8 @@ export const PRIMARY_PROVIDER: ActivityProvider = 'github';
 /** Providers available to connect in step 2 (optional extras) */
 export const OPTIONAL_PROVIDERS: ActivityProvider[] = ['linear', 'jira'];
 
-const API_URL = (import.meta as Record<string, unknown> & { env: Record<string, string> }).env.VITE_API_URL ?? 'http://localhost:3000';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 export function buildOAuthStartUrl(provider: ActivityProvider, callbackOrigin: string): string {
   const redirectUri = `${callbackOrigin}/auth/callback`;
