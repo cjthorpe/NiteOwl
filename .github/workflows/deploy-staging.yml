@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy to Staging
 
 on:
   push:
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: ${{ steps.deploy.outputs.url }}
+      url: ${{ vars.STAGING_API_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -99,7 +99,6 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy API service
-        id: deploy
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
@@ -108,13 +107,30 @@ jobs:
             --image "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ needs.build-and-push.outputs.sha-tag }}" \
             --detach
 
+      - name: Wait for API health check
+        env:
+          STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+        run: |
+          echo "Waiting for API to become healthy…"
+          for i in $(seq 1 20); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_API_URL}/api/health" || true)
+            if [ "$status" = "200" ]; then
+              echo "Health check passed (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: status=$status, retrying in 15s…"
+            sleep 15
+          done
+          echo "Health check failed after 5 minutes"
+          exit 1
+
   deploy-web:
     name: Deploy Web to Railway
     needs: build-and-push
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: ${{ steps.deploy.outputs.url }}
+      url: ${{ vars.STAGING_WEB_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -123,7 +139,6 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy Web service
-        id: deploy
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
