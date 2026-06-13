@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 
 import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 
-import { generateOAuthState, timingSafeCompare } from "../../lib/crypto.js";
+import { generateOAuthState, sha256, timingSafeCompare } from "../../lib/crypto.js";
+import { REFRESH_COOKIE } from "./constants.js";
 
 const STATE_COOKIE = "niteowl_linear_state";
 
@@ -95,22 +96,50 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const clientId = process.env["LINEAR_CLIENT_ID"];
+      const webRoot = process.env["WEB_URL"] ?? "http://localhost:5173";
+
       if (!clientId) {
         return reply
           .code(503)
           .send({ success: false, error: "Linear OAuth not configured" });
       }
 
-      // Connecting Linear requires an existing NiteOwl session.
-      if (!request.user) {
-        return reply
-          .code(401)
-          .send({ success: false, error: "Authentication required" });
+      // Resolve the authenticated user: first try the Bearer token, then fall
+      // back to the refresh cookie (which IS sent to /auth/* paths). This
+      // allows browser-initiated GET navigations — e.g. from the onboarding
+      // page — to work without an explicit Authorization header.
+      let userId = request.user?.sub ?? null;
+
+      if (!userId) {
+        const rawRefresh = request.cookies[REFRESH_COOKIE];
+        if (rawRefresh) {
+          const tokenHash = sha256(rawRefresh);
+          const now = new Date();
+          const [stored] = await db
+            .select({ userId: schema.refreshTokens.userId })
+            .from(schema.refreshTokens)
+            .where(
+              and(
+                eq(schema.refreshTokens.tokenHash, tokenHash),
+                isNull(schema.refreshTokens.rotatedAt),
+                gt(schema.refreshTokens.expiresAt, now),
+              ),
+            )
+            .limit(1);
+          userId = stored?.userId ?? null;
+        }
+      }
+
+      if (!userId) {
+        return reply.redirect(`${webRoot}/login?error=session_expired`, 302);
       }
 
       const state = generateOAuthState();
+      // Embed userId in state cookie so the callback can associate the token
+      // with the correct user without requiring a Bearer header.
+      const stateCookieValue = JSON.stringify({ state, userId });
 
-      reply.setCookie(STATE_COOKIE, state, {
+      reply.setCookie(STATE_COOKIE, stateCookieValue, {
         httpOnly: true,
         sameSite: "lax",
         secure: process.env["NODE_ENV"] === "production",
@@ -142,15 +171,29 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
     async (request, reply) => {
       const { code, state, error } = request.query;
       const webRoot = process.env["WEB_URL"] ?? "http://localhost:5173";
-      const successRedirect = `${webRoot}/settings/integrations?connected=linear`;
+      const successRedirect = `${webRoot}/auth/callback?provider=linear&status=success`;
       const errorRedirect = (msg: string) =>
-        `${webRoot}/settings/integrations?error=${encodeURIComponent(msg)}`;
+        `${webRoot}/auth/callback?provider=linear&status=error&error=${encodeURIComponent(msg)}`;
 
       if (error) {
         return reply.redirect(errorRedirect(error), 302);
       }
 
-      const storedState = request.cookies[STATE_COOKIE];
+      const rawStateCookie = request.cookies[STATE_COOKIE];
+
+      // Parse the state cookie (contains both state and userId)
+      let storedState: string | null = null;
+      let cookieUserId: string | null = null;
+      if (rawStateCookie) {
+        try {
+          const parsed = JSON.parse(rawStateCookie) as { state?: string; userId?: string };
+          storedState = parsed.state ?? null;
+          cookieUserId = parsed.userId ?? null;
+        } catch {
+          // malformed cookie — treat as missing
+        }
+      }
+
       if (!state || !storedState || !timingSafeCompare(state, storedState)) {
         return reply.redirect(errorRedirect("state_mismatch"), 302);
       }
@@ -161,15 +204,15 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         return reply.redirect(errorRedirect("no_code"), 302);
       }
 
-      if (!request.user) {
+      // Resolve userId: prefer Bearer token, fall back to cookie-embedded userId
+      const userId = request.user?.sub ?? cookieUserId;
+      if (!userId) {
         return reply.redirect(`${webRoot}/login?error=session_expired`, 302);
       }
 
       try {
         const tokenData = await exchangeLinearCode(code, redirectUri);
         const viewer = await getLinearViewer(tokenData.access_token);
-
-        const userId = request.user.sub;
         const { id: organizationId, name: organizationName } =
           viewer.organization;
 

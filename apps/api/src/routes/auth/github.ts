@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 
 import type { Db } from "@niteowl/db";
@@ -6,6 +6,7 @@ import { schema } from "@niteowl/db";
 
 import { generateOAuthState, sha256, timingSafeCompare } from "../../lib/crypto.js";
 import { signRefreshToken } from "../../lib/jwt.js";
+import { runGitHubCatchup } from "../../lib/github-catchup.js";
 
 import { REFRESH_COOKIE } from "./constants.js";
 
@@ -196,11 +197,101 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           expires: expiresAt,
         });
 
+        // Register GitHub as a connected integration and store the OAuth token
+        // so the activity feed can ingest events server-side.
+        const userId = user.id;
+
+        const [existingIntegration] = await db
+          .select({ id: schema.integrations.id })
+          .from(schema.integrations)
+          .where(
+            and(
+              eq(schema.integrations.userId, userId),
+              eq(schema.integrations.provider, "github"),
+            ),
+          )
+          .limit(1);
+
+        let integrationId: string;
+        if (existingIntegration) {
+          integrationId = existingIntegration.id;
+          await db
+            .update(schema.integrations)
+            .set({ enabled: true, connectedAt: new Date() })
+            .where(eq(schema.integrations.id, integrationId));
+        } else {
+          const [created] = await db
+            .insert(schema.integrations)
+            .values({ userId, provider: "github", enabled: true })
+            .returning({ id: schema.integrations.id });
+          if (!created) throw new Error("Failed to create GitHub integration");
+          integrationId = created.id;
+        }
+
+        // Upsert OAuth token (raw token stored; encrypt at app layer in prod)
+        const [existingToken] = await db
+          .select({ id: schema.oauthTokens.id })
+          .from(schema.oauthTokens)
+          .where(
+            and(
+              eq(schema.oauthTokens.userId, userId),
+              eq(schema.oauthTokens.provider, "github"),
+            ),
+          )
+          .limit(1);
+
+        if (existingToken) {
+          await db
+            .update(schema.oauthTokens)
+            .set({
+              accessTokenEncrypted: ghToken,
+              scopes: "user:email",
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.oauthTokens.id, existingToken.id));
+        } else {
+          await db.insert(schema.oauthTokens).values({
+            userId,
+            provider: "github",
+            accessTokenEncrypted: ghToken,
+            scopes: "user:email",
+          });
+        }
+
+        // Trigger 24-hour activity catchup in background (non-blocking)
+        runGitHubCatchup({
+          db,
+          userId,
+          integrationId,
+          githubLogin: ghUser.login,
+          accessToken: ghToken,
+        })
+          .then((result) => {
+            fastify.log.info(
+              { userId, integrationId, ...result },
+              "GitHub catchup complete (post-login)",
+            );
+            // Update lastSyncedAt after catchup
+            db.update(schema.integrations)
+              .set({ lastSyncedAt: new Date() })
+              .where(eq(schema.integrations.id, integrationId))
+              .catch(() => { /* non-fatal */ });
+          })
+          .catch((err: unknown) => {
+            fastify.log.error(
+              { err, userId, integrationId },
+              "GitHub catchup failed (post-login)",
+            );
+          });
+
         // Redirect to frontend; the frontend must call POST /auth/refresh to
         // obtain a short-lived access token from the HttpOnly refresh cookie.
         // Never put access tokens in URLs — they appear in browser history and
         // are readable by any JS on the page (violates OAuth 2.0 Security BCP).
-        return reply.redirect(`${webRoot}/auth/callback`, 302);
+        return reply.redirect(
+          `${webRoot}/auth/callback?provider=github&status=success`,
+          302,
+        );
       } catch {
         // Never expose raw error messages to the client — they may contain
         // internal details (DB connection strings, stack traces, etc.)

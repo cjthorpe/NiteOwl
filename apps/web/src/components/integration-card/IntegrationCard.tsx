@@ -24,7 +24,7 @@ export function IntegrationCard({ meta, compact = false }: IntegrationCardProps)
   const connected = isConnected(meta.provider);
 
   const handleConnect = () => {
-    window.location.href = buildOAuthStartUrl(meta.provider, window.location.origin);
+    window.location.href = buildOAuthStartUrl(meta.provider);
   };
 
   const handleDisconnect = () => {

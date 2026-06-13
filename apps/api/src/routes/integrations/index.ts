@@ -5,7 +5,6 @@ import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 
 import { requireAuth } from "../../plugins/auth.js";
-import { runGitHubCatchup } from "../../lib/github-catchup.js";
 import { linearCatchupRoutes } from "./linear-catchup.js";
 
 // ---------------------------------------------------------------------------
@@ -14,13 +13,6 @@ import { linearCatchupRoutes } from "./linear-catchup.js";
 
 interface ToggleBody {
   enabled: boolean;
-}
-
-interface GitHubConnectBody {
-  /** GitHub login for the authenticated user (returned from /auth/github callback) */
-  login: string;
-  /** Decrypted GitHub access token — sent once from the frontend after OAuth */
-  accessToken: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,92 +89,47 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (
     },
   );
 
-  // ── POST /api/integrations/github/connect — upsert GitHub integration ──────
-  // Called by the frontend after OAuth completes to register the integration
-  // and trigger a 24-hour catchup of recent activity.
+  // ── DELETE /api/integrations/providers/:provider — disconnect an integration ─
+  // Clears the integration record and its OAuth token from the database,
+  // satisfying the acceptance criterion: "Disconnecting an integration clears
+  // its tokens from the database."
 
-  fastify.post<{ Body: GitHubConnectBody }>(
-    "/github/connect",
+  fastify.delete<{ Params: { provider: string } }>(
+    "/providers/:provider",
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.user!.sub;
-      const { login, accessToken } = request.body ?? {};
+      const { provider } = request.params;
 
-      if (!login || !accessToken) {
-        return reply
-          .code(400)
-          .send({ error: "login and accessToken are required" });
+      const validProviders = ["github", "linear", "jira", "slack"] as const;
+      type ValidProvider = typeof validProviders[number];
+      if (!validProviders.includes(provider as ValidProvider)) {
+        return reply.code(400).send({ error: "Unknown provider" });
       }
 
-      // Upsert integration row
-      const [integration] = await db
-        .insert(schema.integrations)
-        .values({
-          userId,
-          provider: "github",
-          enabled: true,
-          connectedAt: new Date(),
-        })
-        .onConflictDoNothing()
-        .returning({ id: schema.integrations.id });
+      const typedProvider = provider as ValidProvider;
 
-      // If row already existed, fetch it
-      let integrationId: string;
-      if (integration) {
-        integrationId = integration.id;
-      } else {
-        const [existing] = await db
-          .select({ id: schema.integrations.id })
-          .from(schema.integrations)
-          .where(
-            and(
-              eq(schema.integrations.userId, userId),
-              eq(schema.integrations.provider, "github"),
-            ),
-          )
-          .limit(1);
-
-        if (!existing) {
-          return reply.code(500).send({ error: "Failed to create integration" });
-        }
-        integrationId = existing.id;
-
-        // Re-enable if it was disabled
-        await db
-          .update(schema.integrations)
-          .set({ enabled: true })
-          .where(eq(schema.integrations.id, integrationId));
-      }
-
-      // Trigger catchup in the background (don't block the response)
-      // We log errors but don't surface them — catchup failure is non-fatal
-      runGitHubCatchup({
-        db,
-        userId,
-        integrationId,
-        githubLogin: login,
-        accessToken,
-      })
-        .then((result) => {
-          fastify.log.info(
-            { userId, integrationId, ...result },
-            "GitHub catchup complete",
-          );
-        })
-        .catch((err: unknown) => {
-          fastify.log.error(
-            { err, userId, integrationId },
-            "GitHub catchup failed",
-          );
-        });
-
-      // Update lastSyncedAt optimistically
+      // Delete integration record (activity_events cascade-deletes via FK)
       await db
-        .update(schema.integrations)
-        .set({ lastSyncedAt: new Date() })
-        .where(eq(schema.integrations.id, integrationId));
+        .delete(schema.integrations)
+        .where(
+          and(
+            eq(schema.integrations.userId, userId),
+            eq(schema.integrations.provider, typedProvider),
+          ),
+        );
 
-      return reply.code(200).send({ integrationId, status: "connected" });
+      // Delete OAuth token (never leave credentials in DB after disconnect)
+      await db
+        .delete(schema.oauthTokens)
+        .where(
+          and(
+            eq(schema.oauthTokens.userId, userId),
+            eq(schema.oauthTokens.provider, typedProvider),
+          ),
+        );
+
+      return reply.code(200).send({ success: true });
     },
   );
 

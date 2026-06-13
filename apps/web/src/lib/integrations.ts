@@ -52,7 +52,8 @@ export const OPTIONAL_PROVIDERS: ActivityProvider[] = ['linear', 'jira'];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
-export function buildOAuthStartUrl(provider: ActivityProvider, callbackOrigin: string): string {
-  const redirectUri = `${callbackOrigin}/auth/callback`;
-  return `${API_URL}/api/auth/${provider}/start?redirect_uri=${encodeURIComponent(redirectUri)}`;
+export function buildOAuthStartUrl(provider: ActivityProvider): string {
+  // The API auth route initiates OAuth server-side. The callback redirect_uri
+  // is configured on the API via API_URL/WEB_URL env vars, not the frontend.
+  return `${API_URL}/auth/${provider}`;
 }

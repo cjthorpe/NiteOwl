@@ -56,7 +56,7 @@ export function Onboarding() {
 
 function StepConnectGitHub() {
   const handleConnect = () => {
-    window.location.href = buildOAuthStartUrl(PRIMARY_PROVIDER, window.location.origin);
+    window.location.href = buildOAuthStartUrl(PRIMARY_PROVIDER);
   };
 
   return (
