@@ -22,6 +22,7 @@ export function useFeed(filters: FeedQueryFilters) {
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
     staleTime: 2 * 60 * 1000,
+    refetchInterval: 30 * 1000,
     retry: 2,
   });
 }

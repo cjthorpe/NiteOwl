@@ -32,7 +32,7 @@ describe('App smoke tests', () => {
 
   it('renders the onboarding page on /onboarding', () => {
     renderApp('/onboarding');
-    expect(screen.getByText(/set up your workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/connect github to get started/i)).toBeInTheDocument();
   });
 
   it('redirects unauthenticated users from /dashboard to /login', () => {
