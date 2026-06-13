@@ -204,12 +204,10 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
           302,
           `${webRoot}/auth/callback#token=${accessToken}`,
         );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "unknown_error";
-        return reply.redirect(
-          302,
-          `${webRoot}/login?error=${encodeURIComponent(message)}`,
-        );
+      } catch {
+        // Never expose raw error messages to the client — they may contain
+        // internal details (DB connection strings, stack traces, etc.)
+        return reply.redirect(302, `${webRoot}/login?error=server_error`);
       }
     },
   );
