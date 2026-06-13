@@ -118,6 +118,11 @@ export const activityEvents = pgTable(
     title: text("title").notNull(),
     url: text("url"),
     metadata: jsonb("metadata"),
+    /**
+     * Extracted from metadata at ingestion time — GitHub login, Linear actor name,
+     * Jira display name, etc. Enables feed filtering by ?author= without a JSON scan.
+     */
+    authorLogin: text("author_login"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     ingestedAt: timestamp("ingested_at", { withTimezone: true })
       .notNull()
@@ -133,6 +138,11 @@ export const activityEvents = pgTable(
     index("activity_events_integration_id_occurred_at_idx").on(
       table.integrationId,
       table.occurredAt,
+    ),
+    // Author filter pattern: feed filtered by agent login, newest first.
+    index("activity_events_author_login_occurred_at_idx").on(
+      table.authorLogin,
+      table.occurredAt.desc(),
     ),
     // Idempotent ingestion: same external event per integration never inserted twice.
     unique("activity_events_integration_external_uniq").on(
@@ -253,3 +263,45 @@ export const refreshTokens = pgTable(
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// user_agent_logins
+// ---------------------------------------------------------------------------
+// Per-user registry of AI agent identities per integration.
+// Registered logins auto-populate feed filters and Slack alert botUserLogins.
+
+export const agentIntegrationEnum = pgEnum("agent_integration", [
+  "github",
+  "linear",
+  "jira",
+]);
+
+export const userAgentLogins = pgTable(
+  "user_agent_logins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which integration this login belongs to (github / linear / jira) */
+    integration: agentIntegrationEnum("integration").notNull(),
+    /** The agent's login/username on that integration, e.g. "my-bot[bot]" */
+    login: text("login").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Each (user, integration, login) triple must be unique.
+    unique("user_agent_logins_user_integration_login_uniq").on(
+      table.userId,
+      table.integration,
+      table.login,
+    ),
+    // Fast lookup of all logins for a user.
+    index("user_agent_logins_user_id_idx").on(table.userId),
+  ],
+);
+
+export type UserAgentLogin = typeof userAgentLogins.$inferSelect;
+export type NewUserAgentLogin = typeof userAgentLogins.$inferInsert;
