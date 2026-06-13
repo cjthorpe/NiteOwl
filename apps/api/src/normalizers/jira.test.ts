@@ -191,3 +191,79 @@ describe("normalizeJiraEvent — determinism", () => {
     expect(restA).toEqual(restB);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Comment events
+// ---------------------------------------------------------------------------
+
+const commentCreatedPayload = {
+  webhookEvent: "comment_created",
+  comment: {
+    id: "50001",
+    self: "https://acme.atlassian.net/rest/api/2/issue/10001/comment/50001",
+    body: "Looks good — merging now.",
+    created: "2024-03-16T11:00:00.000+0000",
+    updated: "2024-03-16T11:00:00.000+0000",
+    author: { displayName: "Alice Dev", emailAddress: "alice@acme.com" },
+  },
+  issue: {
+    id: "10001",
+    key: "PROJ-42",
+    self: "https://acme.atlassian.net/rest/api/2/issue/10001",
+    fields: {
+      summary: "Login page crashes on Firefox 124",
+      project: { key: "PROJ", name: "Main Project" },
+    },
+  },
+};
+
+describe("normalizeJiraEvent — comment_created", () => {
+  it("normalizes a comment_created event", () => {
+    const result = normalizeJiraEvent(commentCreatedPayload, USER_ID);
+
+    expect(result).not.toBeNull();
+    expect(result?.provider).toBe("jira");
+    expect(result?.eventType).toBe("comment_created");
+    expect(result?.userId).toBe(USER_ID);
+    expect(result?.sourceId).toBe("comment:50001");
+    expect(result?.title).toBe(
+      "[PROJ] Comment on PROJ-42: Login page crashes on Firefox 124",
+    );
+    expect(result?.description).toBe("Looks good — merging now.");
+    expect(result?.url).toBe(
+      "https://acme.atlassian.net/browse/PROJ-42?focusedCommentId=50001",
+    );
+    expect(result?.occurredAt).toBe("2024-03-16T11:00:00.000+0000");
+    expect(result?.metadata).toMatchObject({
+      commentId: "50001",
+      issueKey: "PROJ-42",
+      projectKey: "PROJ",
+      author: "Alice Dev",
+      authorEmail: "alice@acme.com",
+    });
+  });
+
+  it("returns null for comment_updated (not ingested)", () => {
+    const updated = { ...commentCreatedPayload, webhookEvent: "comment_updated" };
+    expect(normalizeJiraEvent(updated, USER_ID)).toBeNull();
+  });
+
+  it("returns null when comment field is missing", () => {
+    const bad = { webhookEvent: "comment_created", issue: commentCreatedPayload.issue };
+    expect(normalizeJiraEvent(bad, USER_ID)).toBeNull();
+  });
+
+  it("returns null when issue field is missing from comment event", () => {
+    const bad = { webhookEvent: "comment_created", comment: commentCreatedPayload.comment };
+    expect(normalizeJiraEvent(bad, USER_ID)).toBeNull();
+  });
+
+  it("produces stable non-volatile fields across two calls", () => {
+    const a = normalizeJiraEvent(commentCreatedPayload, USER_ID);
+    const b = normalizeJiraEvent(commentCreatedPayload, USER_ID);
+
+    const { id: _ia, ingestedAt: _iia, ...restA } = a!;
+    const { id: _ib, ingestedAt: _iib, ...restB } = b!;
+    expect(restA).toEqual(restB);
+  });
+});

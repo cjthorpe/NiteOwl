@@ -11,6 +11,7 @@ import { authRoutes } from "./routes/auth/index.js";
 import { feedRoutes } from "./routes/feed/index.js";
 import { integrationsRoutes } from "./routes/integrations/index.js";
 import { githubWebhookRoutes } from "./routes/webhooks/github.js";
+import { jiraWebhookRoutes } from "./routes/webhooks/jira.js";
 import { linearWebhookRoutes } from "./routes/webhooks/linear.js";
 import { slackAlertRoutes } from "./routes/slack-alerts/index.js";
 
@@ -139,6 +140,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
     });
   });
   app.register(linearWebhookRoutes, { prefix: "/api/webhooks", db });
+  app.register(jiraWebhookRoutes, { prefix: "/api/webhooks", db });
 
   // Slack alert configuration
   app.register(slackAlertRoutes, { prefix: "/api/slack-alerts", db });

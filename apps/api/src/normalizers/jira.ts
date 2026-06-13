@@ -4,6 +4,27 @@ import type { Activity, ActivityEventType } from "@niteowl/types";
 // Jira webhook payload types (minimal)
 // ---------------------------------------------------------------------------
 
+interface JiraCommentPayload {
+  webhookEvent: "comment_created" | "comment_updated" | "comment_deleted";
+  comment: {
+    id: string;
+    self: string;
+    body: string;
+    created: string;
+    updated: string;
+    author?: { displayName: string; emailAddress: string } | null;
+  };
+  issue: {
+    id: string;
+    key: string;
+    self: string;
+    fields: {
+      summary: string;
+      project: { key: string; name: string };
+    };
+  };
+}
+
 interface JiraIssuePayload {
   webhookEvent: string;
   issue: {
@@ -40,7 +61,9 @@ interface JiraIssuePayload {
 // Event type resolution
 // ---------------------------------------------------------------------------
 
-function resolveJiraEventType(webhookEvent: string): ActivityEventType | null {
+function resolveJiraIssueEventType(
+  webhookEvent: string,
+): ActivityEventType | null {
   switch (webhookEvent) {
     case "jira:issue_created":
       return "issue_opened";
@@ -69,16 +92,90 @@ function refineJiraUpdateType(
 // Public entry point
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Comment normalizer
+// ---------------------------------------------------------------------------
+
+function normalizeJiraComment(
+  typed: JiraCommentPayload,
+  userId: string,
+): Activity | null {
+  if (typed.webhookEvent !== "comment_created") return null;
+
+  const { comment, issue } = typed;
+
+  // Derive the browser URL for the comment from issue.self
+  let commentUrl: string;
+  try {
+    const parsed = new URL(issue.self);
+    commentUrl = `${parsed.protocol}//${parsed.host}/browse/${issue.key}?focusedCommentId=${comment.id}`;
+  } catch {
+    return null;
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    userId,
+    provider: "jira",
+    eventType: "comment_created",
+    sourceId: `comment:${comment.id}`,
+    title: `[${issue.fields.project.key}] Comment on ${issue.key}: ${issue.fields.summary}`,
+    description: comment.body,
+    url: commentUrl,
+    metadata: {
+      commentId: comment.id,
+      issueKey: issue.key,
+      projectKey: issue.fields.project.key,
+      projectName: issue.fields.project.name,
+      author: comment.author?.displayName ?? null,
+      authorEmail: comment.author?.emailAddress ?? null,
+    },
+    occurredAt: comment.created,
+    ingestedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
 /**
  * Normalizes a raw Jira webhook payload into a unified Activity record.
  * Returns null for unrecognised or unactionable event types.
+ *
+ * Handles:
+ *   - webhookEvent: "jira:issue_created" / "jira:issue_updated" / "jira:issue_deleted"
+ *   - webhookEvent: "comment_created"
  */
 export function normalizeJiraEvent(
   payload: Record<string, unknown>,
   userId: string,
 ): Activity | null {
+  if (typeof payload["webhookEvent"] !== "string") {
+    return null;
+  }
+
+  const webhookEvent = payload["webhookEvent"];
+
+  // ── Comment events ────────────────────────────────────────────────────────
   if (
-    typeof payload["webhookEvent"] !== "string" ||
+    webhookEvent === "comment_created" ||
+    webhookEvent === "comment_updated" ||
+    webhookEvent === "comment_deleted"
+  ) {
+    if (
+      payload["comment"] == null ||
+      typeof payload["comment"] !== "object" ||
+      payload["issue"] == null ||
+      typeof payload["issue"] !== "object"
+    ) {
+      return null;
+    }
+    return normalizeJiraComment(payload as unknown as JiraCommentPayload, userId);
+  }
+
+  // ── Issue events ──────────────────────────────────────────────────────────
+  if (
     payload["issue"] == null ||
     typeof payload["issue"] !== "object"
   ) {
@@ -86,7 +183,7 @@ export function normalizeJiraEvent(
   }
 
   const typed = payload as unknown as JiraIssuePayload;
-  const baseEventType = resolveJiraEventType(typed.webhookEvent);
+  const baseEventType = resolveJiraIssueEventType(typed.webhookEvent);
   if (baseEventType === null) return null;
 
   const eventType = refineJiraUpdateType(typed, baseEventType);
