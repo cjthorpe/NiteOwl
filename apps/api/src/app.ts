@@ -15,6 +15,7 @@ import { jiraWebhookRoutes } from "./routes/webhooks/jira.js";
 import { linearWebhookRoutes } from "./routes/webhooks/linear.js";
 import { slackAlertRoutes } from "./routes/slack-alerts/index.js";
 import { agentLoginRoutes } from "./routes/agent-logins/index.js";
+import { usersRoutes } from "./routes/users/index.js";
 
 export interface BuildAppOptions {
   /** Injected in tests; production uses DATABASE_URL env var */
@@ -148,6 +149,9 @@ export function buildApp(opts: BuildAppOptions = {}) {
 
   // Agent login registry
   app.register(agentLoginRoutes, { prefix: "/api/agent-logins", db });
+
+  // User profile (JWT-derived, no DB hit)
+  app.register(usersRoutes, { prefix: "/api/users" });
 
   return app;
 }

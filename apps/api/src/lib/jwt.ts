@@ -7,6 +7,13 @@ const REFRESH_TOKEN_MS = 7 * 24 * 60 * 60 * 1000;
 export interface TokenPayload extends JWTPayload {
   sub: string; // userId
   email: string;
+  /**
+   * ISO-8601 timestamp of the user's previous session start, snapshotted at
+   * login time. Null for new users or users who have never logged in before.
+   * Stable for the lifetime of this access token — does not update on refresh
+   * within the same session.
+   */
+  lastSeenAt: string | null;
 }
 
 function getSecret(): Uint8Array {
@@ -18,8 +25,9 @@ function getSecret(): Uint8Array {
 export async function signAccessToken(
   userId: string,
   email: string,
+  lastSeenAt?: Date | null,
 ): Promise<string> {
-  return new SignJWT({ email })
+  return new SignJWT({ email, lastSeenAt: lastSeenAt?.toISOString() ?? null })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()
@@ -48,5 +56,8 @@ export async function verifyToken(token: string): Promise<TokenPayload> {
   if (!payload.sub || typeof payload["email"] !== "string") {
     throw new Error("Invalid token payload");
   }
-  return payload as TokenPayload;
+  // `lastSeenAt` was added in FUL-63; older tokens omit it — normalise to null.
+  const lastSeenAt =
+    typeof payload["lastSeenAt"] === "string" ? payload["lastSeenAt"] : null;
+  return { ...payload, lastSeenAt } as TokenPayload;
 }
