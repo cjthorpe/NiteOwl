@@ -5,7 +5,7 @@ import type { Db } from "@niteowl/db";
 import { schema } from "@niteowl/db";
 
 import { sha256 } from "../../lib/crypto.js";
-import { signAccessToken } from "../../lib/jwt.js";
+import { signAccessToken, signRefreshToken } from "../../lib/jwt.js";
 import { emailAuthRoutes } from "./email.js";
 import { githubAuthRoutes } from "./github.js";
 
@@ -63,6 +63,28 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (
       if (!user) {
         return reply.code(401).send({ success: false, error: "User not found" });
       }
+
+      // Rotating refresh token: delete the consumed token and issue a new one.
+      await db
+        .delete(schema.refreshTokens)
+        .where(eq(schema.refreshTokens.id, stored.id));
+
+      const { token: newRawRefresh, expiresAt: newExpiresAt } =
+        await signRefreshToken(user.id, user.email);
+
+      await db.insert(schema.refreshTokens).values({
+        userId: user.id,
+        tokenHash: sha256(newRawRefresh),
+        expiresAt: newExpiresAt,
+      });
+
+      reply.setCookie(REFRESH_COOKIE, newRawRefresh, {
+        httpOnly: true,
+        sameSite: "strict",
+        secure: process.env["NODE_ENV"] === "production",
+        path: "/auth",
+        expires: newExpiresAt,
+      });
 
       const accessToken = await signAccessToken(user.id, user.email);
 

@@ -175,3 +175,41 @@ describe("POST /auth/refresh", () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+// ── Tests: POST /auth/refresh (happy path + rotation) ─────────────────────
+describe("POST /auth/refresh — token rotation", () => {
+  it("issues a new access token and rotates the refresh cookie on success", async () => {
+    // limit() is the terminal call on select chains — override per-call.
+    // 1st call: find stored refresh token; 2nd call: look up user.
+    mockDb.limit
+      .mockImplementationOnce(() =>
+        Promise.resolve([{ id: "rt-001", userId: "user-001" }]),
+      )
+      .mockImplementationOnce(() =>
+        Promise.resolve([{ id: "user-001", email: "alice@example.com" }]),
+      );
+
+    // delete().where() and insert().values() chain back to mockDb via
+    // mockReturnThis — awaiting a non-thenable resolves immediately.
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      cookies: { niteowl_refresh: "valid-refresh-jwt" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ success: boolean; data: { accessToken: string } }>();
+    expect(body.success).toBe(true);
+    expect(typeof body.data.accessToken).toBe("string");
+    expect(body.data.accessToken.split(".")).toHaveLength(3);
+
+    // A new refresh cookie must be set (token rotation)
+    const setCookieHeader = res.headers["set-cookie"] as string | string[];
+    const cookieStr = Array.isArray(setCookieHeader)
+      ? setCookieHeader.join("; ")
+      : (setCookieHeader ?? "");
+    expect(cookieStr).toMatch(/niteowl_refresh/);
+  });
+});
