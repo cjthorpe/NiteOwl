@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
+import { AgentSettings } from './pages/AgentSettings';
 import { Dashboard } from './pages/Dashboard';
 import { Integrations } from './pages/Integrations';
 import { Login } from './pages/Login';
@@ -22,6 +23,8 @@ export default function App() {
           <Route path="/integrations" element={<Integrations />} />
           {/* /settings/integrations is the canonical URL per spec */}
           <Route path="/settings/integrations" element={<Integrations />} />
+          {/* Agent login registry */}
+          <Route path="/settings/agents" element={<AgentSettings />} />
           <Route path="/settings" element={<Navigate to="/settings/integrations" replace />} />
         </Route>
       </Route>

@@ -29,6 +29,16 @@ function IconIntegrations() {
   );
 }
 
+function IconAgents() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="5" r="3" />
+      <path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" />
+      <path d="M11 5h1.5M12 4v2" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -41,6 +51,7 @@ function IconSettings() {
 const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: IconDashboard },
   { to: '/settings/integrations', label: 'Integrations', icon: IconIntegrations },
+  { to: '/settings/agents', label: 'AI Agents', icon: IconAgents },
   { to: '/settings', label: 'Settings', icon: IconSettings },
 ];
 

@@ -34,6 +34,12 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   /** GitHub numeric user ID — null until GitHub OAuth is connected */
   githubId: text("github_id").unique(),
+  /**
+   * Timestamp of the most recent session start. Snapshotted into the JWT at
+   * login so the feed can compute a "since last login" window that stays stable
+   * for the entire session (no collapse-to-zero on refresh).
+   */
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
