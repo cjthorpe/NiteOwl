@@ -11,11 +11,7 @@ import {
   PRIMARY_PROVIDER,
 } from '../lib/integrations';
 
-const STEPS = [
-  { label: 'Connect GitHub' },
-  { label: 'Add integration' },
-  { label: 'Done' },
-];
+const STEPS = [{ label: 'Connect GitHub' }, { label: 'Add integration' }, { label: 'Done' }];
 
 export function Onboarding() {
   const navigate = useNavigate();
@@ -24,10 +20,7 @@ export function Onboarding() {
   const step = githubConnected ? 2 : 1;
 
   return (
-    <div
-      className="flex min-h-dvh flex-col"
-      style={{ backgroundColor: 'var(--color-surface)' }}
-    >
+    <div className="flex min-h-dvh flex-col" style={{ backgroundColor: 'var(--color-surface)' }}>
       {/* Header */}
       <header
         className="flex items-center justify-between px-6 py-4 border-b"
@@ -66,15 +59,10 @@ function StepConnectGitHub() {
         className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl"
         style={{
           backgroundColor: 'oklch(95% 0 0 / 0.08)',
-          boxShadow:
-            '0 0 0 1px oklch(95% 0 0 / 0.15), 0 12px 40px oklch(0% 0 0 / 0.4)',
+          boxShadow: '0 0 0 1px oklch(95% 0 0 / 0.15), 0 12px 40px oklch(0% 0 0 / 0.4)',
         }}
       >
-        <ProviderLogo
-          provider="github"
-          size={40}
-          style={{ color: 'oklch(95% 0 0)' }}
-        />
+        <ProviderLogo provider="github" size={40} style={{ color: 'oklch(95% 0 0)' }} />
       </div>
 
       <h1
@@ -91,8 +79,8 @@ function StepConnectGitHub() {
           lineHeight: 1.7,
         }}
       >
-        NiteOwl captures your pull requests, commits, and code reviews to give
-        you a complete picture of your engineering output.
+        NiteOwl captures your pull requests, commits, and code reviews to give you a complete
+        picture of your engineering output.
       </p>
 
       {/* Hero CTA */}
@@ -122,43 +110,28 @@ function StepConnectGitHub() {
         Connect GitHub
       </button>
 
-      <p
-        className="mt-6 text-xs"
-        style={{ color: 'var(--color-text-subtle)' }}
-      >
-        You&apos;ll be redirected to GitHub to authorize. We never store your
-        code.
+      <p className="mt-6 text-xs" style={{ color: 'var(--color-text-subtle)' }}>
+        You&apos;ll be redirected to GitHub to authorize. We never store your code.
       </p>
 
       {/* What we capture */}
       <div className="mt-12 flex flex-wrap justify-center gap-x-6 gap-y-2">
-        {(['Pull requests', 'Commits', 'Code reviews', 'Issues'] as const).map(
-          (cap) => (
-            <div key={cap} className="flex items-center gap-2">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                aria-hidden
-              >
-                <path
-                  d="M2.5 7l3 3 6-6"
-                  stroke="var(--color-success)"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span
-                className="text-xs"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                {cap}
-              </span>
-            </div>
-          ),
-        )}
+        {(['Pull requests', 'Commits', 'Code reviews', 'Issues'] as const).map((cap) => (
+          <div key={cap} className="flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <path
+                d="M2.5 7l3 3 6-6"
+                stroke="var(--color-success)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              {cap}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -189,8 +162,7 @@ function StepOptionalIntegrations({ onContinue }: { onContinue: () => void }) {
             color: 'var(--color-text-muted)',
           }}
         >
-          Add more integrations to enrich your feed, or continue to your
-          dashboard.
+          Add more integrations to enrich your feed, or continue to your dashboard.
         </p>
       </div>
 
@@ -199,17 +171,11 @@ function StepOptionalIntegrations({ onContinue }: { onContinue: () => void }) {
 
       {/* Optional section divider */}
       <div className="my-5 flex items-center gap-3">
-        <div
-          className="flex-1 h-px"
-          style={{ backgroundColor: 'var(--color-border)' }}
-        />
+        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
         <span className="text-xs" style={{ color: 'var(--color-text-subtle)' }}>
           Optional
         </span>
-        <div
-          className="flex-1 h-px"
-          style={{ backgroundColor: 'var(--color-border)' }}
-        />
+        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-border)' }} />
       </div>
 
       {/* Optional integration cards */}
@@ -242,14 +208,9 @@ function StepOptionalIntegrations({ onContinue }: { onContinue: () => void }) {
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          {anyOptionalConnected
-            ? 'Continue to dashboard →'
-            : 'Skip for now →'}
+          {anyOptionalConnected ? 'Continue to dashboard →' : 'Skip for now →'}
         </button>
-        <p
-          className="text-xs"
-          style={{ color: 'var(--color-text-subtle)' }}
-        >
+        <p className="text-xs" style={{ color: 'var(--color-text-subtle)' }}>
           You can add integrations any time in Settings.
         </p>
       </div>

@@ -24,9 +24,9 @@ DATABASE_URL=postgres://user:pass@host/db pnpm --filter @niteowl/db db:studio
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| Variable            | Description                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | PostgreSQL connection string                                                       |
 | `DB_ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM field encryption. Generate: `openssl rand -hex 32` |
 
 ## Package Exports

@@ -16,10 +16,7 @@ export function DashboardLayout() {
 
   return (
     <div className="layout-shell">
-      <Sidebar
-        id="sidebar-nav"
-        onNavigate={() => setSidebarOpen(false)}
-      />
+      <Sidebar id="sidebar-nav" onNavigate={() => setSidebarOpen(false)} />
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
@@ -35,17 +32,11 @@ export function DashboardLayout() {
         className={`layout-sidebar-mobile${sidebarOpen ? ' is-open' : ''}`}
         aria-hidden={!sidebarOpen}
       >
-        <Sidebar
-          id="sidebar-mobile-nav"
-          onNavigate={() => setSidebarOpen(false)}
-        />
+        <Sidebar id="sidebar-mobile-nav" onNavigate={() => setSidebarOpen(false)} />
       </div>
 
       <div className="layout-main">
-        <TopBar
-          onMenuToggle={() => setSidebarOpen((prev) => !prev)}
-          menuOpen={sidebarOpen}
-        />
+        <TopBar onMenuToggle={() => setSidebarOpen((prev) => !prev)} menuOpen={sidebarOpen} />
 
         <main className="layout-content" id="main-content">
           <ErrorBoundary>

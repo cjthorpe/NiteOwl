@@ -66,33 +66,32 @@ export function useAgentLogins(): UseAgentLoginsReturn {
     }
 
     void fetchLogins();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ── Add login ─────────────────────────────────────────────────────────────
-  const addLogin = useCallback(
-    async (integration: AgentIntegration, login: string) => {
-      const res = await fetch(`${API_URL}/api/agent-logins`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ integration, login }),
-      });
+  const addLogin = useCallback(async (integration: AgentIntegration, login: string) => {
+    const res = await fetch(`${API_URL}/api/agent-logins`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ integration, login }),
+    });
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `HTTP ${res.status}`);
+    }
 
-      const data = (await res.json()) as { login: AgentLogin };
-      // Upsert into local state (avoid duplicates if server returned existing row)
-      setLogins((prev) => {
-        const exists = prev.some((l) => l.id === data.login.id);
-        return exists ? prev : [...prev, data.login];
-      });
-    },
-    [],
-  );
+    const data = (await res.json()) as { login: AgentLogin };
+    // Upsert into local state (avoid duplicates if server returned existing row)
+    setLogins((prev) => {
+      const exists = prev.some((l) => l.id === data.login.id);
+      return exists ? prev : [...prev, data.login];
+    });
+  }, []);
 
   // ── Remove login ──────────────────────────────────────────────────────────
   const removeLogin = useCallback(async (id: string) => {
@@ -111,14 +110,11 @@ export function useAgentLogins(): UseAgentLoginsReturn {
 
   // ── Derived selectors ─────────────────────────────────────────────────────
   const byIntegration = useCallback(
-    (integration: AgentIntegration) =>
-      logins.filter((l) => l.integration === integration),
+    (integration: AgentIntegration) => logins.filter((l) => l.integration === integration),
     [logins],
   );
 
-  const githubLogins = logins
-    .filter((l) => l.integration === 'github')
-    .map((l) => l.login);
+  const githubLogins = logins.filter((l) => l.integration === 'github').map((l) => l.login);
 
   return { logins, isLoading, error, addLogin, removeLogin, byIntegration, githubLogins };
 }

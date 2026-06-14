@@ -31,19 +31,19 @@ export interface SlackMessage {
 }
 
 export type SlackBlock =
-  | { type: "header"; text: SlackTextObject }
-  | { type: "section"; text: SlackTextObject; accessory?: SlackButtonElement }
-  | { type: "context"; elements: SlackTextObject[] }
-  | { type: "divider" };
+  | { type: 'header'; text: SlackTextObject }
+  | { type: 'section'; text: SlackTextObject; accessory?: SlackButtonElement }
+  | { type: 'context'; elements: SlackTextObject[] }
+  | { type: 'divider' };
 
 export interface SlackTextObject {
-  type: "plain_text" | "mrkdwn";
+  type: 'plain_text' | 'mrkdwn';
   text: string;
   emoji?: boolean;
 }
 
 export interface SlackButtonElement {
-  type: "button";
+  type: 'button';
   text: SlackTextObject;
   url: string;
   action_id: string;
@@ -79,10 +79,10 @@ const RETRY_DELAY_MS = 500;
  *   NiteOwl Alert · 16 Mar 2024
  */
 export function formatPrMergeAlert(data: PrMergeAlertData): SlackMessage {
-  const ts = new Date(data.occurredAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+  const ts = new Date(data.occurredAt).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
 
   const fallbackText = `PR #${data.prNumber} merged into ${data.baseBranch} on ${data.repo}: "${data.prTitle}" by ${data.author}`;
@@ -91,32 +91,32 @@ export function formatPrMergeAlert(data: PrMergeAlertData): SlackMessage {
     text: fallbackText,
     blocks: [
       {
-        type: "header",
+        type: 'header',
         text: {
-          type: "plain_text",
+          type: 'plain_text',
           text: `🎉 PR merged — ${data.repo}`,
           emoji: true,
         },
       },
       {
-        type: "section",
+        type: 'section',
         text: {
-          type: "mrkdwn",
+          type: 'mrkdwn',
           text: `*<${data.url}|#${data.prNumber}: ${escapeMarkdown(data.prTitle)}>*\nMerged by *${escapeMarkdown(data.author)}* into \`${escapeMarkdown(data.baseBranch)}\``,
         },
         accessory: {
-          type: "button",
-          text: { type: "plain_text", text: "Open PR ↗", emoji: false },
+          type: 'button',
+          text: { type: 'plain_text', text: 'Open PR ↗', emoji: false },
           url: data.url,
-          action_id: "open_pr",
+          action_id: 'open_pr',
         },
       },
-      { type: "divider" },
+      { type: 'divider' },
       {
-        type: "context",
+        type: 'context',
         elements: [
           {
-            type: "mrkdwn",
+            type: 'mrkdwn',
             text: `NiteOwl Alert · ${ts}`,
           },
         ],
@@ -145,8 +145,8 @@ export async function sendSlackAlert(
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
       const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(message),
       });
 
@@ -156,7 +156,7 @@ export async function sendSlackAlert(
 
       // 4xx errors are permanent — don't retry (bad URL, revoked token, etc.)
       if (response.status >= 400 && response.status < 500) {
-        const body = await response.text().catch(() => "");
+        const body = await response.text().catch(() => '');
         throw new SlackAlertError(
           `Slack webhook returned ${response.status}: ${body}`,
           response.status,
@@ -166,7 +166,7 @@ export async function sendSlackAlert(
       }
 
       // 5xx — transient; fall through to retry
-      const body = await response.text().catch(() => "");
+      const body = await response.text().catch(() => '');
       lastError = new SlackAlertError(
         `Slack webhook returned ${response.status}: ${body}`,
         response.status,
@@ -203,7 +203,7 @@ export class SlackAlertError extends Error {
     public readonly permanent: boolean,
   ) {
     super(message);
-    this.name = "SlackAlertError";
+    this.name = 'SlackAlertError';
   }
 }
 
@@ -218,9 +218,9 @@ function sleep(ms: number): Promise<void> {
 /** Escape characters that have special meaning in Slack mrkdwn. */
 function escapeMarkdown(text: string): string {
   return text.replace(/[&<>]/g, (c) => {
-    if (c === "&") return "&amp;";
-    if (c === "<") return "&lt;";
-    if (c === ">") return "&gt;";
+    if (c === '&') return '&amp;';
+    if (c === '<') return '&lt;';
+    if (c === '>') return '&gt;';
     return c;
   });
 }

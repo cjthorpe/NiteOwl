@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // We test the enrichPayload logic indirectly via the exported runGitHubCatchup.
@@ -8,36 +8,36 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock global fetch so we can exercise the rate-limit path without network
 const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+vi.stubGlobal('fetch', mockFetch);
 
 // ---------------------------------------------------------------------------
 // Rate-limit header parsing — tested via a thin re-export trick.
 // We inline representative tests here using the mock fetch.
 // ---------------------------------------------------------------------------
 
-describe("GitHub catchup — rate limit handling", () => {
+describe('GitHub catchup — rate limit handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("stops paginating when no events fall within the lookback window", async () => {
+  it('stops paginating when no events fall within the lookback window', async () => {
     // Return one page of events that are all older than 24 h
     const old = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
     const oldEventPage = {
       ok: true,
       headers: new Map([
-        ["x-ratelimit-remaining", "50"],
-        ["x-ratelimit-reset", String(Math.floor(Date.now() / 1000) + 3600)],
-        ["link", ""],
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
       ]),
       json: async () => [
         {
-          id: "evt-1",
-          type: "PushEvent",
-          actor: { id: 1, login: "octocat" },
-          repo: { id: 1, name: "acme/app" },
-          payload: { ref: "refs/heads/main", after: "abc123", before: "000000", commits: [] },
+          id: 'evt-1',
+          type: 'PushEvent',
+          actor: { id: 1, login: 'octocat' },
+          repo: { id: 1, name: 'acme/app' },
+          payload: { ref: 'refs/heads/main', after: 'abc123', before: '000000', commits: [] },
           created_at: old,
         },
       ],
@@ -55,14 +55,14 @@ describe("GitHub catchup — rate limit handling", () => {
       returning: vi.fn().mockResolvedValue([]),
     };
 
-    const { runGitHubCatchup } = await import("./github-catchup.js");
+    const { runGitHubCatchup } = await import('./github-catchup.js');
 
     const result = await runGitHubCatchup({
-      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]["db"],
-      userId: "user-1",
-      integrationId: "int-1",
-      githubLogin: "octocat",
-      accessToken: "ghp_test",
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'octocat',
+      accessToken: 'ghp_test',
       lookbackHours: 24,
     });
 
@@ -71,7 +71,7 @@ describe("GitHub catchup — rate limit handling", () => {
     expect(result.inserted).toBe(0);
   });
 
-  it("respects X-RateLimit-Remaining and waits when near limit", async () => {
+  it('respects X-RateLimit-Remaining and waits when near limit', async () => {
     const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
     const resetSoon = Math.floor(Date.now() / 1000) + 1; // reset in 1 second
 
@@ -79,30 +79,30 @@ describe("GitHub catchup — rate limit handling", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       headers: new Map([
-        ["x-ratelimit-remaining", "2"], // below threshold of 5 → should wait
-        ["x-ratelimit-reset", String(resetSoon)],
-        ["link", ""],
+        ['x-ratelimit-remaining', '2'], // below threshold of 5 → should wait
+        ['x-ratelimit-reset', String(resetSoon)],
+        ['link', ''],
       ]),
       json: async () => [
         {
-          id: "evt-push",
-          type: "PushEvent",
-          actor: { id: 99, login: "dev" },
-          repo: { id: 2, name: "acme/api" },
+          id: 'evt-push',
+          type: 'PushEvent',
+          actor: { id: 99, login: 'dev' },
+          repo: { id: 2, name: 'acme/api' },
           payload: {
-            ref: "refs/heads/main",
-            after: "deadbeef",
-            before: "000000",
+            ref: 'refs/heads/main',
+            after: 'deadbeef',
+            before: '000000',
             commits: [
               {
-                id: "deadbeef",
-                message: "feat: add feature",
-                url: "https://github.com/acme/api/commit/deadbeef",
+                id: 'deadbeef',
+                message: 'feat: add feature',
+                url: 'https://github.com/acme/api/commit/deadbeef',
                 timestamp: recent,
               },
             ],
-            repository: { full_name: "acme/api", html_url: "https://github.com/acme/api" },
-            pusher: { name: "dev" },
+            repository: { full_name: 'acme/api', html_url: 'https://github.com/acme/api' },
+            pusher: { name: 'dev' },
           },
           created_at: recent,
         },
@@ -113,9 +113,9 @@ describe("GitHub catchup — rate limit handling", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       headers: new Map([
-        ["x-ratelimit-remaining", "60"],
-        ["x-ratelimit-reset", String(Math.floor(Date.now() / 1000) + 3600)],
-        ["link", ""],
+        ['x-ratelimit-remaining', '60'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
       ]),
       json: async () => [],
     } as unknown as Response);
@@ -132,14 +132,14 @@ describe("GitHub catchup — rate limit handling", () => {
       returning: vi.fn().mockResolvedValue([{ id: insertedIds[insertedIds.length - 1] }]),
     };
 
-    const { runGitHubCatchup } = await import("./github-catchup.js");
+    const { runGitHubCatchup } = await import('./github-catchup.js');
 
     const result = await runGitHubCatchup({
-      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]["db"],
-      userId: "user-1",
-      integrationId: "int-1",
-      githubLogin: "dev",
-      accessToken: "ghp_test2",
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'dev',
+      accessToken: 'ghp_test2',
       lookbackHours: 24,
     });
 

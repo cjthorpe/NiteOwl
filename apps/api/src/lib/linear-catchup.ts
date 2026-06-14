@@ -7,9 +7,9 @@
  *  - overnight-catchup BullMQ repeating job  (FUL-60)
  */
 
-import { eq } from "drizzle-orm";
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import { eq } from 'drizzle-orm';
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
 // ---------------------------------------------------------------------------
 // Linear GraphQL types (minimal)
@@ -76,11 +76,11 @@ export async function fetchRecentlyCompletedIssues(
   accessToken: string,
   since: Date,
 ): Promise<LinearIssueNode[]> {
-  const res = await fetch("https://api.linear.app/graphql", {
-    method: "POST",
+  const res = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       query: CATCHUP_QUERY,
@@ -95,9 +95,7 @@ export async function fetchRecentlyCompletedIssues(
   const body = (await res.json()) as LinearIssuesResponse;
 
   if (body.errors && body.errors.length > 0) {
-    throw new Error(
-      `Linear GraphQL error: ${body.errors.map((e) => e.message).join(", ")}`,
-    );
+    throw new Error(`Linear GraphQL error: ${body.errors.map((e) => e.message).join(', ')}`);
   }
 
   return body.data?.issues?.nodes ?? [];
@@ -137,9 +135,7 @@ export interface LinearCatchupResult {
  *
  * Idempotent — duplicate externalIds are silently ignored via ON CONFLICT DO NOTHING.
  */
-export async function runLinearCatchup(
-  opts: LinearCatchupOptions,
-): Promise<LinearCatchupResult> {
+export async function runLinearCatchup(opts: LinearCatchupOptions): Promise<LinearCatchupResult> {
   const { db, userId, integrationId, accessToken, lookbackHours = 24 } = opts;
 
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
@@ -155,18 +151,14 @@ export async function runLinearCatchup(
 
   const rows = issues.map((issue) => {
     const stateType = issue.state.type;
-    const occurredAt = new Date(
-      issue.completedAt ?? issue.canceledAt ?? issue.updatedAt,
-    );
+    const occurredAt = new Date(issue.completedAt ?? issue.canceledAt ?? issue.updatedAt);
     const eventType =
-      stateType === "completed" || stateType === "cancelled"
-        ? "issue_closed"
-        : "issue_updated";
+      stateType === 'completed' || stateType === 'cancelled' ? 'issue_closed' : 'issue_updated';
 
     return {
       userId,
       integrationId,
-      provider: "linear" as const,
+      provider: 'linear' as const,
       eventType,
       externalId: issueToExternalId(issue),
       title: `[${issue.team.key}] ${issue.identifier}: ${issue.title}`,

@@ -18,16 +18,16 @@
  * dashboard (Bull Board, Arena, etc.).
  */
 
-import { Worker } from "bullmq";
-import { and, eq } from "drizzle-orm";
+import { Worker } from 'bullmq';
+import { and, eq } from 'drizzle-orm';
 
-import type { Db } from "@niteowl/db";
-import { decrypt, schema } from "@niteowl/db";
-import type { SlackAlertJobData } from "@niteowl/types";
+import type { Db } from '@niteowl/db';
+import { decrypt, schema } from '@niteowl/db';
+import type { SlackAlertJobData } from '@niteowl/types';
 
-import { formatPrMergeAlert, sendSlackAlert } from "../lib/slack-alert.js";
+import { formatPrMergeAlert, sendSlackAlert } from '../lib/slack-alert.js';
 
-export const SLACK_ALERT_QUEUE = "slack-alert";
+export const SLACK_ALERT_QUEUE = 'slack-alert';
 
 /**
  * Creates and starts the BullMQ Slack-alert worker.
@@ -63,7 +63,7 @@ export function createSlackAlertWorker(
       if (!config) {
         // Config deleted since enqueue — drop silently, do not retry.
         console.info(
-          `[slack-alert-worker] Config ${configId} no longer exists — dropping job ${job.id ?? ""}`,
+          `[slack-alert-worker] Config ${configId} no longer exists — dropping job ${job.id ?? ''}`,
         );
         return;
       }
@@ -71,7 +71,7 @@ export function createSlackAlertWorker(
       if (!config.enabled) {
         // Config disabled since enqueue — drop silently, do not retry.
         console.info(
-          `[slack-alert-worker] Config ${configId} is disabled — dropping job ${job.id ?? ""}`,
+          `[slack-alert-worker] Config ${configId} is disabled — dropping job ${job.id ?? ''}`,
         );
         return;
       }
@@ -83,7 +83,7 @@ export function createSlackAlertWorker(
       const result = await sendSlackAlert(webhookUrl, message, 0);
 
       console.info(
-        `[slack-alert-worker] Alert sent for config ${configId} (job ${job.id ?? ""}) after ${result.attempts} HTTP attempt(s)`,
+        `[slack-alert-worker] Alert sent for config ${configId} (job ${job.id ?? ''}) after ${result.attempts} HTTP attempt(s)`,
       );
     },
     {
@@ -92,9 +92,9 @@ export function createSlackAlertWorker(
     },
   );
 
-  worker.on("failed", (job, err) => {
+  worker.on('failed', (job, err) => {
     console.error(
-      `[slack-alert-worker] Job ${job?.id ?? "unknown"} failed (attempt ${job?.attemptsMade ?? "?"}/4)`,
+      `[slack-alert-worker] Job ${job?.id ?? 'unknown'} failed (attempt ${job?.attemptsMade ?? '?'}/4)`,
       {
         configId: job?.data.configId,
         repo: job?.data.alertData.repo,
@@ -103,9 +103,9 @@ export function createSlackAlertWorker(
     );
   });
 
-  worker.on("completed", (job) => {
+  worker.on('completed', (job) => {
     console.info(
-      `[slack-alert-worker] Job ${job.id ?? ""} completed for config ${job.data.configId}`,
+      `[slack-alert-worker] Job ${job.id ?? ''} completed for config ${job.data.configId}`,
     );
   });
 

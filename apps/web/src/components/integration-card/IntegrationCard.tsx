@@ -42,7 +42,9 @@ export function IntegrationCard({ meta, compact = false }: IntegrationCardProps)
           : 'hover:bg-[var(--color-surface-overlay)]',
         compact ? 'p-4' : 'p-5',
       ].join(' ')}
-      style={{ transition: `border-color var(--duration-normal) var(--ease-out-expo), background-color var(--duration-normal) var(--ease-out-expo)` }}
+      style={{
+        transition: `border-color var(--duration-normal) var(--ease-out-expo), background-color var(--duration-normal) var(--ease-out-expo)`,
+      }}
     >
       {/* Logo */}
       <div
@@ -66,7 +68,10 @@ export function IntegrationCard({ meta, compact = false }: IntegrationCardProps)
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold leading-tight" style={{ color: 'var(--color-text)' }}>
+            <h3
+              className="text-sm font-semibold leading-tight"
+              style={{ color: 'var(--color-text)' }}
+            >
               {meta.name}
             </h3>
             {!compact && (
@@ -115,7 +120,10 @@ export function IntegrationCard({ meta, compact = false }: IntegrationCardProps)
 
         {/* Connected stats */}
         {connected && connection && (
-          <div className="mt-2 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <div
+            className="mt-2 flex flex-wrap gap-3 text-xs"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             <span>
               <span style={{ color: 'var(--color-text)' }} className="font-semibold tabular-nums">
                 {connection.eventCount.toLocaleString()}

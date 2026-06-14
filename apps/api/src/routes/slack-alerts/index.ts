@@ -12,17 +12,14 @@
  *   POST   /api/slack-alerts/:id/test — send a test Slack message
  */
 
-import { and, eq } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import { and, eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from "@niteowl/db";
-import { encrypt, decrypt, schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { encrypt, decrypt, schema } from '@niteowl/db';
 
-import { requireAuth } from "../../plugins/auth.js";
-import {
-  formatPrMergeAlert,
-  sendSlackAlert,
-} from "../../lib/slack-alert.js";
+import { requireAuth } from '../../plugins/auth.js';
+import { formatPrMergeAlert, sendSlackAlert } from '../../lib/slack-alert.js';
 
 // ---------------------------------------------------------------------------
 // Request body types
@@ -54,36 +51,29 @@ interface UpdateBody {
 const WEBHOOK_URL_PATTERN = /^https:\/\/hooks\.slack\.com\//;
 
 function validateWebhookUrl(url: unknown): url is string {
-  return typeof url === "string" && WEBHOOK_URL_PATTERN.test(url);
+  return typeof url === 'string' && WEBHOOK_URL_PATTERN.test(url);
 }
 
 function validateWatchedRepos(repos: unknown): repos is string[] {
   if (!Array.isArray(repos)) return false;
-  return repos.every(
-    (r) => typeof r === "string" && r.includes("/") && r.length <= 200,
-  );
+  return repos.every((r) => typeof r === 'string' && r.includes('/') && r.length <= 200);
 }
 
 function validateBotUserLogins(logins: unknown): logins is string[] {
   if (!Array.isArray(logins)) return false;
-  return logins.every(
-    (l) => typeof l === "string" && l.length > 0 && l.length <= 200,
-  );
+  return logins.every((l) => typeof l === 'string' && l.length > 0 && l.length <= 200);
 }
 
 // ---------------------------------------------------------------------------
 // Route plugin
 // ---------------------------------------------------------------------------
 
-export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
-  fastify,
-  opts,
-) => {
+export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) => {
   const { db } = opts;
 
   // ── GET /api/slack-alerts ─────────────────────────────────────────────────
 
-  fastify.get("/", { preHandler: requireAuth }, async (request, reply) => {
+  fastify.get('/', { preHandler: requireAuth }, async (request, reply) => {
     const userId = request.user!.sub;
 
     const rows = await db
@@ -105,62 +95,57 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
   // ── POST /api/slack-alerts ────────────────────────────────────────────────
 
-  fastify.post<{ Body: CreateBody }>(
-    "/",
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const userId = request.user!.sub;
-      const body = request.body;
+  fastify.post<{ Body: CreateBody }>('/', { preHandler: requireAuth }, async (request, reply) => {
+    const userId = request.user!.sub;
+    const body = request.body;
 
-      if (!validateWebhookUrl(body?.webhookUrl)) {
-        return reply.code(400).send({
-          error:
-            "webhookUrl must be a valid Slack Incoming Webhook URL (https://hooks.slack.com/…)",
-        });
-      }
+    if (!validateWebhookUrl(body?.webhookUrl)) {
+      return reply.code(400).send({
+        error: 'webhookUrl must be a valid Slack Incoming Webhook URL (https://hooks.slack.com/…)',
+      });
+    }
 
-      const watchedRepos = body.watchedRepos ?? [];
-      if (!validateWatchedRepos(watchedRepos)) {
-        return reply.code(400).send({
-          error: 'watchedRepos must be an array of "owner/repo" strings',
-        });
-      }
+    const watchedRepos = body.watchedRepos ?? [];
+    if (!validateWatchedRepos(watchedRepos)) {
+      return reply.code(400).send({
+        error: 'watchedRepos must be an array of "owner/repo" strings',
+      });
+    }
 
-      const botUserLogins = body.botUserLogins ?? [];
-      if (!validateBotUserLogins(botUserLogins)) {
-        return reply.code(400).send({
-          error: "botUserLogins must be an array of non-empty GitHub login strings",
-        });
-      }
+    const botUserLogins = body.botUserLogins ?? [];
+    if (!validateBotUserLogins(botUserLogins)) {
+      return reply.code(400).send({
+        error: 'botUserLogins must be an array of non-empty GitHub login strings',
+      });
+    }
 
-      const webhookUrlEncrypted = encrypt(body.webhookUrl);
+    const webhookUrlEncrypted = encrypt(body.webhookUrl);
 
-      const [created] = await db
-        .insert(schema.slackAlertConfigs)
-        .values({
-          userId,
-          webhookUrlEncrypted,
-          watchedRepos,
-          botUserLogins,
-          enabled: true,
-        })
-        .returning({
-          id: schema.slackAlertConfigs.id,
-          watchedRepos: schema.slackAlertConfigs.watchedRepos,
-          botUserLogins: schema.slackAlertConfigs.botUserLogins,
-          enabled: schema.slackAlertConfigs.enabled,
-          createdAt: schema.slackAlertConfigs.createdAt,
-          updatedAt: schema.slackAlertConfigs.updatedAt,
-        });
+    const [created] = await db
+      .insert(schema.slackAlertConfigs)
+      .values({
+        userId,
+        webhookUrlEncrypted,
+        watchedRepos,
+        botUserLogins,
+        enabled: true,
+      })
+      .returning({
+        id: schema.slackAlertConfigs.id,
+        watchedRepos: schema.slackAlertConfigs.watchedRepos,
+        botUserLogins: schema.slackAlertConfigs.botUserLogins,
+        enabled: schema.slackAlertConfigs.enabled,
+        createdAt: schema.slackAlertConfigs.createdAt,
+        updatedAt: schema.slackAlertConfigs.updatedAt,
+      });
 
-      return reply.code(201).send({ config: created });
-    },
-  );
+    return reply.code(201).send({ config: created });
+  });
 
   // ── PATCH /api/slack-alerts/:id ───────────────────────────────────────────
 
   fastify.patch<{ Params: { id: string }; Body: UpdateBody }>(
-    "/:id",
+    '/:id',
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.user!.sub;
@@ -179,7 +164,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         if (!validateWebhookUrl(body.webhookUrl)) {
           return reply.code(400).send({
             error:
-              "webhookUrl must be a valid Slack Incoming Webhook URL (https://hooks.slack.com/…)",
+              'webhookUrl must be a valid Slack Incoming Webhook URL (https://hooks.slack.com/…)',
           });
         }
         updates.webhookUrlEncrypted = encrypt(body.webhookUrl);
@@ -197,17 +182,15 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
       if (body.botUserLogins !== undefined) {
         if (!validateBotUserLogins(body.botUserLogins)) {
           return reply.code(400).send({
-            error: "botUserLogins must be an array of non-empty GitHub login strings",
+            error: 'botUserLogins must be an array of non-empty GitHub login strings',
           });
         }
         updates.botUserLogins = body.botUserLogins;
       }
 
       if (body.enabled !== undefined) {
-        if (typeof body.enabled !== "boolean") {
-          return reply
-            .code(400)
-            .send({ error: "enabled must be a boolean" });
+        if (typeof body.enabled !== 'boolean') {
+          return reply.code(400).send({ error: 'enabled must be a boolean' });
         }
         updates.enabled = body.enabled;
       }
@@ -216,10 +199,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .update(schema.slackAlertConfigs)
         .set(updates)
         .where(
-          and(
-            eq(schema.slackAlertConfigs.id, id),
-            eq(schema.slackAlertConfigs.userId, userId),
-          ),
+          and(eq(schema.slackAlertConfigs.id, id), eq(schema.slackAlertConfigs.userId, userId)),
         )
         .returning({
           id: schema.slackAlertConfigs.id,
@@ -231,7 +211,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         });
 
       if (!updated) {
-        return reply.code(404).send({ error: "Slack alert config not found" });
+        return reply.code(404).send({ error: 'Slack alert config not found' });
       }
 
       return reply.code(200).send({ config: updated });
@@ -241,7 +221,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
   // ── DELETE /api/slack-alerts/:id ──────────────────────────────────────────
 
   fastify.delete<{ Params: { id: string } }>(
-    "/:id",
+    '/:id',
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.user!.sub;
@@ -250,15 +230,12 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
       const [deleted] = await db
         .delete(schema.slackAlertConfigs)
         .where(
-          and(
-            eq(schema.slackAlertConfigs.id, id),
-            eq(schema.slackAlertConfigs.userId, userId),
-          ),
+          and(eq(schema.slackAlertConfigs.id, id), eq(schema.slackAlertConfigs.userId, userId)),
         )
         .returning({ id: schema.slackAlertConfigs.id });
 
       if (!deleted) {
-        return reply.code(404).send({ error: "Slack alert config not found" });
+        return reply.code(404).send({ error: 'Slack alert config not found' });
       }
 
       return reply.code(204).send();
@@ -268,7 +245,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
   // ── POST /api/slack-alerts/:id/test ───────────────────────────────────────
 
   fastify.post<{ Params: { id: string } }>(
-    "/:id/test",
+    '/:id/test',
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.user!.sub;
@@ -281,26 +258,23 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         })
         .from(schema.slackAlertConfigs)
         .where(
-          and(
-            eq(schema.slackAlertConfigs.id, id),
-            eq(schema.slackAlertConfigs.userId, userId),
-          ),
+          and(eq(schema.slackAlertConfigs.id, id), eq(schema.slackAlertConfigs.userId, userId)),
         )
         .limit(1);
 
       if (!config) {
-        return reply.code(404).send({ error: "Slack alert config not found" });
+        return reply.code(404).send({ error: 'Slack alert config not found' });
       }
 
       const webhookUrl = decrypt(config.webhookUrlEncrypted);
 
       const testMessage = formatPrMergeAlert({
-        repo: "your-org/example-repo",
+        repo: 'your-org/example-repo',
         prNumber: 0,
-        prTitle: "NiteOwl test message — alerts are working!",
-        author: "niteowl-bot",
-        url: "https://github.com",
-        baseBranch: "main",
+        prTitle: 'NiteOwl test message — alerts are working!',
+        author: 'niteowl-bot',
+        url: 'https://github.com',
+        baseBranch: 'main',
         occurredAt: new Date().toISOString(),
       });
 
@@ -308,8 +282,7 @@ export const slackAlertRoutes: FastifyPluginAsync<{ db: Db }> = async (
         const result = await sendSlackAlert(webhookUrl, testMessage);
         return reply.code(200).send({ ok: true, attempts: result.attempts });
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Slack delivery failed";
+        const message = err instanceof Error ? err.message : 'Slack delivery failed';
         return reply.code(502).send({ error: message });
       }
     },
@@ -344,10 +317,7 @@ export async function getEnabledAlertsForUser(
     })
     .from(schema.slackAlertConfigs)
     .where(
-      and(
-        eq(schema.slackAlertConfigs.userId, userId),
-        eq(schema.slackAlertConfigs.enabled, true),
-      ),
+      and(eq(schema.slackAlertConfigs.userId, userId), eq(schema.slackAlertConfigs.enabled, true)),
     );
 
   return rows.map((r) => ({

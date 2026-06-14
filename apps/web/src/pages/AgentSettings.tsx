@@ -207,8 +207,9 @@ function IntegrationSection({
               (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--color-border-focus)';
             }}
             onBlur={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor =
-                localError ? 'var(--color-danger)' : 'var(--color-border)';
+              (e.currentTarget as HTMLInputElement).style.borderColor = localError
+                ? 'var(--color-danger)'
+                : 'var(--color-border)';
             }}
           />
           {localError && (
@@ -231,9 +232,7 @@ function IntegrationSection({
           disabled={pending || !inputValue.trim()}
           style={{
             alignSelf: 'flex-end',
-            background: pending
-              ? 'oklch(68% 0.22 278 / 0.5)'
-              : 'oklch(68% 0.22 278)',
+            background: pending ? 'oklch(68% 0.22 278 / 0.5)' : 'oklch(68% 0.22 278)',
             border: 'none',
             borderRadius: 'var(--radius-md)',
             color: 'oklch(98% 0 0)',
@@ -283,8 +282,8 @@ export function AgentSettings() {
             maxWidth: '52ch',
           }}
         >
-          Register the usernames your AI coding agents use on each integration. Registered
-          logins auto-populate feed filters and Slack alert configurations.
+          Register the usernames your AI coding agents use on each integration. Registered logins
+          auto-populate feed filters and Slack alert configurations.
         </p>
       </header>
 
