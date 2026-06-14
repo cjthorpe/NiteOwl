@@ -2,6 +2,7 @@
   "name": "niteowl",
   "private": true,
   "version": "0.0.1",
+  "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=22.13.0",
     "pnpm": ">=9.0.0"
