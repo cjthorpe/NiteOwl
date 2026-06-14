@@ -7,6 +7,8 @@ settings:
 overrides:
   esbuild: '>=0.28.1'
 
+pnpmfileChecksum: sha256-mqAzNepMdI0TMWKOIRE5tlvSFYDayk3px+eFWCO10Iw=
+
 importers:
 
   .:
