@@ -1,10 +1,10 @@
-import { and, desc, eq, gte, lt, or, sql } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
-import { requireAuth } from "../../plugins/auth.js";
+import { requireAuth } from '../../plugins/auth.js';
 
 const CACHE_TTL_SECONDS = 60; // 1 minute — per FUL-22 spec
 const DEFAULT_HOURS = 8;
@@ -33,20 +33,20 @@ interface CursorPayload {
 
 function encodeCursor(occurredAt: Date, id: string): string {
   const payload: CursorPayload = { occurredAt: occurredAt.toISOString(), id };
-  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return Buffer.from(JSON.stringify(payload)).toString('base64url');
 }
 
 function decodeCursor(cursor: string): CursorPayload | null {
   try {
-    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const raw = Buffer.from(cursor, 'base64url').toString('utf8');
     const parsed = JSON.parse(raw) as unknown;
     if (
-      typeof parsed === "object" &&
+      typeof parsed === 'object' &&
       parsed !== null &&
-      "occurredAt" in parsed &&
-      "id" in parsed &&
-      typeof (parsed as CursorPayload).occurredAt === "string" &&
-      typeof (parsed as CursorPayload).id === "string"
+      'occurredAt' in parsed &&
+      'id' in parsed &&
+      typeof (parsed as CursorPayload).occurredAt === 'string' &&
+      typeof (parsed as CursorPayload).id === 'string'
     ) {
       return parsed as CursorPayload;
     }
@@ -71,12 +71,12 @@ function feedCacheKey(
   if (repo) parts.push(`r:${repo}`);
   if (author) parts.push(`a:${author}`);
   if (cursor) parts.push(`c:${cursor}`);
-  return parts.join(":");
+  return parts.join(':');
 }
 
 /** Store the cache key in a user-level set for targeted invalidation */
 async function trackCacheKey(
-  redis: import("ioredis").Redis,
+  redis: import('ioredis').Redis,
   userId: string,
   key: string,
 ): Promise<void> {
@@ -88,7 +88,7 @@ async function trackCacheKey(
 
 /** Invalidate all cached feed pages for a user — called on new activity ingestion */
 export async function invalidateFeedCache(
-  redis: import("ioredis").Redis,
+  redis: import('ioredis').Redis,
   userId: string,
 ): Promise<void> {
   const setKey = `feed-keys:${userId}`;
@@ -98,14 +98,11 @@ export async function invalidateFeedCache(
   }
 }
 
-export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
-  fastify,
-  opts,
-) => {
+export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) => {
   const { db } = opts;
 
   fastify.get<{ Querystring: FeedQuery }>(
-    "/",
+    '/',
     { preHandler: requireAuth },
     async (request, reply) => {
       const userId = request.user!.sub;
@@ -115,7 +112,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
       // (snapshotted in the JWT at login). All other cases use `?hours`.
       let since: Date;
       let hours: number;
-      if (request.query.since === "last_login") {
+      if (request.query.since === 'last_login') {
         const jwtLastSeenAt = request.user!.lastSeenAt;
         if (jwtLastSeenAt) {
           since = new Date(jwtLastSeenAt);
@@ -127,9 +124,8 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
         }
       } else {
         const hoursRaw = parseInt(request.query.hours ?? String(DEFAULT_HOURS), 10);
-        hours = Number.isNaN(hoursRaw) || hoursRaw < 1
-          ? DEFAULT_HOURS
-          : Math.min(hoursRaw, MAX_HOURS);
+        hours =
+          Number.isNaN(hoursRaw) || hoursRaw < 1 ? DEFAULT_HOURS : Math.min(hoursRaw, MAX_HOURS);
         since = new Date(Date.now() - hours * 60 * 60 * 1000);
       }
 
@@ -141,18 +137,25 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
       // For cache-key purposes, encode `since=last_login` as the resolved ISO
       // timestamp so two users with different lastSeenAt values never share a
       // cache slot.
-      const sinceKey = request.query.since === "last_login"
-        ? `sl:${since.toISOString()}`
-        : undefined;
+      const sinceKey =
+        request.query.since === 'last_login' ? `sl:${since.toISOString()}` : undefined;
 
-      const cacheKey = feedCacheKey(userId, hours, provider, eventType, repo, author, sinceKey ?? cursorRaw);
+      const cacheKey = feedCacheKey(
+        userId,
+        hours,
+        provider,
+        eventType,
+        repo,
+        author,
+        sinceKey ?? cursorRaw,
+      );
 
       // ── Cache read ────────────────────────────────────────────────────────
       const redis = fastify.redis;
-      if (redis.status === "ready") {
+      if (redis.status === 'ready') {
         const cached = await redis.get(cacheKey);
         if (cached) {
-          void reply.header("X-Cache", "HIT");
+          void reply.header('X-Cache', 'HIT');
           return reply.code(200).send(JSON.parse(cached));
         }
       }
@@ -162,26 +165,25 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
         gte(schema.activityEvents.occurredAt, since),
       ];
 
-      const validProviders = ["github", "linear", "jira", "slack"] as const;
+      const validProviders = ['github', 'linear', 'jira', 'slack'] as const;
       if (provider && validProviders.includes(provider as (typeof validProviders)[number])) {
         conditions.push(
-          eq(
-            schema.activityEvents.provider,
-            provider as (typeof validProviders)[number],
-          ),
+          eq(schema.activityEvents.provider, provider as (typeof validProviders)[number]),
         );
       }
 
       const validEventTypes = [
-        "pr_opened", "pr_merged", "pr_closed",
-        "commit_pushed",
-        "issue_opened", "issue_closed", "issue_updated",
-        "comment_created",
+        'pr_opened',
+        'pr_merged',
+        'pr_closed',
+        'commit_pushed',
+        'issue_opened',
+        'issue_closed',
+        'issue_updated',
+        'comment_created',
       ] as const;
       if (eventType && validEventTypes.includes(eventType as (typeof validEventTypes)[number])) {
-        conditions.push(
-          eq(schema.activityEvents.eventType, eventType),
-        );
+        conditions.push(eq(schema.activityEvents.eventType, eventType));
       }
 
       if (author) {
@@ -207,10 +209,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .select()
         .from(schema.activityEvents)
         .where(and(...conditions))
-        .orderBy(
-          desc(schema.activityEvents.occurredAt),
-          desc(schema.activityEvents.id),
-        )
+        .orderBy(desc(schema.activityEvents.occurredAt), desc(schema.activityEvents.id))
         .limit(PAGE_SIZE + 1); // fetch one extra to detect next page
 
       const hasMore = rows.length > PAGE_SIZE;
@@ -237,20 +236,18 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
         ? activities.filter((a) => {
             const meta = a.metadata as Record<string, unknown> | null;
             const repoName =
-              typeof meta?.["repo"] === "string"
-                ? meta["repo"].toLowerCase()
-                : typeof meta?.["repository"] === "string"
-                ? (meta["repository"] as string).toLowerCase()
-                : null;
+              typeof meta?.['repo'] === 'string'
+                ? meta['repo'].toLowerCase()
+                : typeof meta?.['repository'] === 'string'
+                  ? (meta['repository'] as string).toLowerCase()
+                  : null;
             return repoName?.includes(repo) ?? false;
           })
         : activities;
 
       const lastItem = filtered[filtered.length - 1];
       const nextCursor =
-        hasMore && lastItem
-          ? encodeCursor(lastItem.occurredAt, lastItem.id)
-          : null;
+        hasMore && lastItem ? encodeCursor(lastItem.occurredAt, lastItem.id) : null;
 
       const body = {
         activities: filtered,
@@ -259,12 +256,12 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (
       };
 
       // ── Cache write ───────────────────────────────────────────────────────
-      if (redis.status === "ready") {
-        void redis.set(cacheKey, JSON.stringify(body), "EX", CACHE_TTL_SECONDS);
+      if (redis.status === 'ready') {
+        void redis.set(cacheKey, JSON.stringify(body), 'EX', CACHE_TTL_SECONDS);
         void trackCacheKey(redis, userId, cacheKey);
       }
 
-      void reply.header("X-Cache", "MISS");
+      void reply.header('X-Cache', 'MISS');
       return reply.code(200).send(body);
     },
   );

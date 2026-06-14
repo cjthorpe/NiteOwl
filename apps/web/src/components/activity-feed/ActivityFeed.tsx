@@ -11,10 +11,14 @@ import { ErrorState } from './ErrorState';
 
 function timeRangeToHours(range: TimeRange): number {
   switch (range) {
-    case '8h': return 8;
-    case '12h': return 12;
-    case '24h': return 24;
-    case 'custom': return 24;
+    case '8h':
+      return 8;
+    case '12h':
+      return 12;
+    case '24h':
+      return 24;
+    case 'custom':
+      return 24;
   }
 }
 
@@ -36,15 +40,8 @@ export function ActivityFeed() {
     eventTypes: filters.eventTypes,
   };
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useFeed(feedFilters);
+  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useFeed(feedFilters);
 
   const allItems = data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -63,13 +60,9 @@ export function ActivityFeed() {
 
       {isLoading && <ActivityFeedSkeleton />}
 
-      {isError && !isLoading && (
-        <ErrorState onRetry={() => void refetch()} />
-      )}
+      {isError && !isLoading && <ErrorState onRetry={() => void refetch()} />}
 
-      {!isLoading && !isError && allItems.length === 0 && (
-        <EmptyState hours={feedFilters.hours} />
-      )}
+      {!isLoading && !isError && allItems.length === 0 && <EmptyState hours={feedFilters.hours} />}
 
       {!isLoading && !isError && allItems.length > 0 && (
         <>

@@ -1,14 +1,14 @@
-import { eq } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import { eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
-import { sha256 } from "../../lib/crypto.js";
-import { signAccessToken, signRefreshToken } from "../../lib/jwt.js";
-import { hashPassword, verifyPassword } from "../../lib/password.js";
+import { sha256 } from '../../lib/crypto.js';
+import { signAccessToken, signRefreshToken } from '../../lib/jwt.js';
+import { hashPassword, verifyPassword } from '../../lib/password.js';
 
-import { REFRESH_COOKIE } from "./constants.js";
+import { REFRESH_COOKIE } from './constants.js';
 
 interface RegisterBody {
   email: string;
@@ -21,25 +21,22 @@ interface LoginBody {
   password: string;
 }
 
-export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
-  fastify,
-  { db },
-) => {
-  fastify.post<{ Body: RegisterBody }>("/register", {
-    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
+  fastify.post<{ Body: RegisterBody }>('/register', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
-        type: "object",
-        required: ["email", "password"],
+        type: 'object',
+        required: ['email', 'password'],
         properties: {
-          email: { type: "string", format: "email" },
-          password: { type: "string", minLength: 8, maxLength: 72 },
-          displayName: { type: "string" },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', minLength: 8, maxLength: 72 },
+          displayName: { type: 'string' },
         },
       },
     },
     handler: async (request, reply) => {
-      const { email, password, displayName = "" } = request.body;
+      const { email, password, displayName = '' } = request.body;
 
       const existing = await db
         .select({ id: schema.users.id })
@@ -48,7 +45,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .limit(1);
 
       if (existing.length > 0) {
-        return reply.code(409).send({ success: false, error: "Email already registered" });
+        return reply.code(409).send({ success: false, error: 'Email already registered' });
       }
 
       const passwordHash = await hashPassword(password);
@@ -59,7 +56,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .values({ email, displayName, passwordHash })
         .returning({ id: schema.users.id, email: schema.users.email });
 
-      if (!user) throw new Error("Failed to create user");
+      if (!user) throw new Error('Failed to create user');
 
       // Stamp last_seen_at = now (marks session open; next login will snapshot this).
       await db
@@ -69,10 +66,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       // lastSeenAt in the JWT is null for brand-new users (no prior session).
       const accessToken = await signAccessToken(user.id, user.email, null);
-      const { token: rawRefresh, expiresAt } = await signRefreshToken(
-        user.id,
-        user.email,
-      );
+      const { token: rawRefresh, expiresAt } = await signRefreshToken(user.id, user.email);
 
       await db.insert(schema.refreshTokens).values({
         userId: user.id,
@@ -82,9 +76,9 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       reply.setCookie(REFRESH_COOKIE, rawRefresh, {
         httpOnly: true,
-        sameSite: "strict",
-        secure: process.env["NODE_ENV"] === "production",
-        path: "/auth",
+        sameSite: 'strict',
+        secure: process.env['NODE_ENV'] === 'production',
+        path: '/auth',
         expires: expiresAt,
       });
 
@@ -96,15 +90,15 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
     },
   });
 
-  fastify.post<{ Body: LoginBody }>("/login", {
-    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+  fastify.post<{ Body: LoginBody }>('/login', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
-        type: "object",
-        required: ["email", "password"],
+        type: 'object',
+        required: ['email', 'password'],
         properties: {
-          email: { type: "string", format: "email" },
-          password: { type: "string" },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string' },
         },
       },
     },
@@ -123,16 +117,12 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .limit(1);
 
       if (!user || !user.passwordHash) {
-        return reply
-          .code(401)
-          .send({ success: false, error: "Invalid credentials" });
+        return reply.code(401).send({ success: false, error: 'Invalid credentials' });
       }
 
       const valid = await verifyPassword(password, user.passwordHash);
       if (!valid) {
-        return reply
-          .code(401)
-          .send({ success: false, error: "Invalid credentials" });
+        return reply.code(401).send({ success: false, error: 'Invalid credentials' });
       }
 
       // Snapshot the current last_seen_at into the JWT before overwriting it.
@@ -145,10 +135,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .where(eq(schema.users.id, user.id));
 
       const accessToken = await signAccessToken(user.id, user.email, snapshotLastSeenAt);
-      const { token: rawRefresh, expiresAt } = await signRefreshToken(
-        user.id,
-        user.email,
-      );
+      const { token: rawRefresh, expiresAt } = await signRefreshToken(user.id, user.email);
 
       await db.insert(schema.refreshTokens).values({
         userId: user.id,
@@ -158,9 +145,9 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       reply.setCookie(REFRESH_COOKIE, rawRefresh, {
         httpOnly: true,
-        sameSite: "strict",
-        secure: process.env["NODE_ENV"] === "production",
-        path: "/auth",
+        sameSite: 'strict',
+        secure: process.env['NODE_ENV'] === 'production',
+        path: '/auth',
         expires: expiresAt,
       });
 

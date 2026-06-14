@@ -1,4 +1,4 @@
-import type { Activity, ActivityEventType } from "@niteowl/types";
+import type { Activity, ActivityEventType } from '@niteowl/types';
 
 // ---------------------------------------------------------------------------
 // Linear webhook payload types (minimal)
@@ -6,7 +6,7 @@ import type { Activity, ActivityEventType } from "@niteowl/types";
 
 interface LinearIssuePayload {
   action: string;
-  type: "Issue";
+  type: 'Issue';
   data: {
     id: string;
     identifier: string;
@@ -27,7 +27,7 @@ interface LinearIssuePayload {
 
 interface LinearCommentPayload {
   action: string;
-  type: "Comment";
+  type: 'Comment';
   data: {
     id: string;
     body: string;
@@ -49,16 +49,12 @@ interface LinearCommentPayload {
 // Event type resolution
 // ---------------------------------------------------------------------------
 
-function resolveLinearIssueEventType(
-  action: string,
-  stateType: string,
-): ActivityEventType | null {
-  if (action === "create") return "issue_opened";
-  if (action === "remove") return "issue_closed";
-  if (action === "update") {
-    if (stateType === "completed" || stateType === "cancelled")
-      return "issue_closed";
-    return "issue_updated";
+function resolveLinearIssueEventType(action: string, stateType: string): ActivityEventType | null {
+  if (action === 'create') return 'issue_opened';
+  if (action === 'remove') return 'issue_closed';
+  if (action === 'update') {
+    if (stateType === 'completed' || stateType === 'cancelled') return 'issue_closed';
+    return 'issue_updated';
   }
   return null;
 }
@@ -67,24 +63,21 @@ function resolveLinearIssueEventType(
 // Issue normalizer
 // ---------------------------------------------------------------------------
 
-function normalizeIssue(
-  typed: LinearIssuePayload,
-  userId: string,
-): Activity | null {
+function normalizeIssue(typed: LinearIssuePayload, userId: string): Activity | null {
   const { action, data } = typed;
   const stateType = data.state.type;
   const eventType = resolveLinearIssueEventType(action, stateType);
   if (eventType === null) return null;
 
   const occurredAt =
-    eventType === "issue_closed"
+    eventType === 'issue_closed'
       ? (data.completedAt ?? data.canceledAt ?? data.updatedAt)
       : data.updatedAt;
 
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "linear",
+    provider: 'linear',
     eventType,
     sourceId: `issue:${data.id}:${action}`,
     title: `[${data.team.key}] ${data.identifier}: ${data.title}`,
@@ -109,11 +102,8 @@ function normalizeIssue(
 // Comment normalizer
 // ---------------------------------------------------------------------------
 
-function normalizeComment(
-  typed: LinearCommentPayload,
-  userId: string,
-): Activity | null {
-  if (typed.action !== "create") return null;
+function normalizeComment(typed: LinearCommentPayload, userId: string): Activity | null {
+  if (typed.action !== 'create') return null;
 
   const { data } = typed;
   const { issue } = data;
@@ -124,8 +114,8 @@ function normalizeComment(
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "linear",
-    eventType: "comment_created",
+    provider: 'linear',
+    eventType: 'comment_created',
     sourceId: `comment:${data.id}`,
     title: `[${issue.team.key}] Comment on ${issue.identifier}: ${issue.title}`,
     description: data.body,
@@ -162,21 +152,21 @@ export function normalizeLinearEvent(
   userId: string,
 ): Activity | null {
   if (
-    typeof payload["type"] !== "string" ||
-    typeof payload["action"] !== "string" ||
-    payload["data"] == null ||
-    typeof payload["data"] !== "object"
+    typeof payload['type'] !== 'string' ||
+    typeof payload['action'] !== 'string' ||
+    payload['data'] == null ||
+    typeof payload['data'] !== 'object'
   ) {
     return null;
   }
 
-  const type = payload["type"];
+  const type = payload['type'];
 
-  if (type === "Issue") {
+  if (type === 'Issue') {
     return normalizeIssue(payload as unknown as LinearIssuePayload, userId);
   }
 
-  if (type === "Comment") {
+  if (type === 'Comment') {
     return normalizeComment(payload as unknown as LinearCommentPayload, userId);
   }
 

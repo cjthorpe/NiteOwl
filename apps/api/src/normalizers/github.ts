@@ -1,4 +1,4 @@
-import type { Activity, ActivityEventType } from "@niteowl/types";
+import type { Activity, ActivityEventType } from '@niteowl/types';
 
 // ---------------------------------------------------------------------------
 // GitHub webhook payload types (minimal — only what we need for normalisation)
@@ -60,20 +60,16 @@ interface GitHubIssuePayload {
 // Event type resolution
 // ---------------------------------------------------------------------------
 
-function resolvePrEventType(
-  action: string,
-  merged: boolean,
-): ActivityEventType | null {
-  if (action === "opened") return "pr_opened";
-  if (action === "closed") return merged ? "pr_merged" : "pr_closed";
+function resolvePrEventType(action: string, merged: boolean): ActivityEventType | null {
+  if (action === 'opened') return 'pr_opened';
+  if (action === 'closed') return merged ? 'pr_merged' : 'pr_closed';
   return null;
 }
 
 function resolveIssueEventType(action: string): ActivityEventType | null {
-  if (action === "opened") return "issue_opened";
-  if (action === "closed") return "issue_closed";
-  if (action === "edited" || action === "labeled" || action === "assigned")
-    return "issue_updated";
+  if (action === 'opened') return 'issue_opened';
+  if (action === 'closed') return 'issue_closed';
+  if (action === 'edited' || action === 'labeled' || action === 'assigned') return 'issue_updated';
   return null;
 }
 
@@ -81,23 +77,18 @@ function resolveIssueEventType(action: string): ActivityEventType | null {
 // Normalizers
 // ---------------------------------------------------------------------------
 
-function normalizePullRequest(
-  payload: GitHubPullRequestPayload,
-  userId: string,
-): Activity | null {
+function normalizePullRequest(payload: GitHubPullRequestPayload, userId: string): Activity | null {
   const { action, pull_request: pr } = payload;
   const eventType = resolvePrEventType(action, pr.merged);
   if (eventType === null) return null;
 
   const occurredAt =
-    eventType === "pr_merged" && pr.merged_at != null
-      ? pr.merged_at
-      : pr.updated_at;
+    eventType === 'pr_merged' && pr.merged_at != null ? pr.merged_at : pr.updated_at;
 
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "github",
+    provider: 'github',
     eventType,
     sourceId: `pr:${pr.id}:${action}`,
     title: `[${payload.repository.full_name}] PR #${pr.number}: ${pr.title}`,
@@ -116,24 +107,21 @@ function normalizePullRequest(
   };
 }
 
-function normalizePush(
-  payload: GitHubPushPayload,
-  userId: string,
-): Activity | null {
+function normalizePush(payload: GitHubPushPayload, userId: string): Activity | null {
   const { commits } = payload;
   if (commits.length === 0) return null;
 
   const firstCommit = commits[0]!;
   const count = commits.length;
-  const branch = payload.ref.replace("refs/heads/", "");
+  const branch = payload.ref.replace('refs/heads/', '');
 
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "github",
-    eventType: "commit_pushed",
+    provider: 'github',
+    eventType: 'commit_pushed',
     sourceId: `push:${payload.after}`,
-    title: `[${payload.repository.full_name}] ${count} commit${count > 1 ? "s" : ""} pushed to ${branch}`,
+    title: `[${payload.repository.full_name}] ${count} commit${count > 1 ? 's' : ''} pushed to ${branch}`,
     description: firstCommit.message,
     url: `${payload.repository.html_url}/commit/${payload.after}`,
     metadata: {
@@ -149,23 +137,18 @@ function normalizePush(
   };
 }
 
-function normalizeIssue(
-  payload: GitHubIssuePayload,
-  userId: string,
-): Activity | null {
+function normalizeIssue(payload: GitHubIssuePayload, userId: string): Activity | null {
   const { action, issue } = payload;
   const eventType = resolveIssueEventType(action);
   if (eventType === null) return null;
 
   const occurredAt =
-    eventType === "issue_closed" && issue.closed_at != null
-      ? issue.closed_at
-      : issue.updated_at;
+    eventType === 'issue_closed' && issue.closed_at != null ? issue.closed_at : issue.updated_at;
 
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "github",
+    provider: 'github',
     eventType,
     sourceId: `issue:${issue.id}:${action}`,
     title: `[${payload.repository.full_name}] Issue #${issue.number}: ${issue.title}`,
@@ -197,18 +180,15 @@ export function normalizeGitHubEvent(
   userId: string,
 ): Activity | null {
   // Detect event type by shape of the payload.
-  if ("pull_request" in payload) {
-    return normalizePullRequest(
-      payload as unknown as GitHubPullRequestPayload,
-      userId,
-    );
+  if ('pull_request' in payload) {
+    return normalizePullRequest(payload as unknown as GitHubPullRequestPayload, userId);
   }
 
-  if ("commits" in payload && "ref" in payload) {
+  if ('commits' in payload && 'ref' in payload) {
     return normalizePush(payload as unknown as GitHubPushPayload, userId);
   }
 
-  if ("issue" in payload) {
+  if ('issue' in payload) {
     return normalizeIssue(payload as unknown as GitHubIssuePayload, userId);
   }
 

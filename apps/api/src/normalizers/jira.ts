@@ -1,11 +1,11 @@
-import type { Activity, ActivityEventType } from "@niteowl/types";
+import type { Activity, ActivityEventType } from '@niteowl/types';
 
 // ---------------------------------------------------------------------------
 // Jira webhook payload types (minimal)
 // ---------------------------------------------------------------------------
 
 interface JiraCommentPayload {
-  webhookEvent: "comment_created" | "comment_updated" | "comment_deleted";
+  webhookEvent: 'comment_created' | 'comment_updated' | 'comment_deleted';
   comment: {
     id: string;
     self: string;
@@ -61,17 +61,15 @@ interface JiraIssuePayload {
 // Event type resolution
 // ---------------------------------------------------------------------------
 
-function resolveJiraIssueEventType(
-  webhookEvent: string,
-): ActivityEventType | null {
+function resolveJiraIssueEventType(webhookEvent: string): ActivityEventType | null {
   switch (webhookEvent) {
-    case "jira:issue_created":
-      return "issue_opened";
-    case "jira:issue_deleted":
-      return "issue_closed";
-    case "jira:issue_updated":
+    case 'jira:issue_created':
+      return 'issue_opened';
+    case 'jira:issue_deleted':
+      return 'issue_closed';
+    case 'jira:issue_updated':
       // Classify as closed when transitioning to a "done" category.
-      return "issue_updated";
+      return 'issue_updated';
     default:
       return null;
   }
@@ -81,11 +79,10 @@ function refineJiraUpdateType(
   payload: JiraIssuePayload,
   base: ActivityEventType,
 ): ActivityEventType {
-  if (base !== "issue_updated") return base;
-  const statusCategoryKey =
-    payload.issue.fields.status.statusCategory.key.toLowerCase();
-  if (statusCategoryKey === "done") return "issue_closed";
-  return "issue_updated";
+  if (base !== 'issue_updated') return base;
+  const statusCategoryKey = payload.issue.fields.status.statusCategory.key.toLowerCase();
+  if (statusCategoryKey === 'done') return 'issue_closed';
+  return 'issue_updated';
 }
 
 // ---------------------------------------------------------------------------
@@ -96,11 +93,8 @@ function refineJiraUpdateType(
 // Comment normalizer
 // ---------------------------------------------------------------------------
 
-function normalizeJiraComment(
-  typed: JiraCommentPayload,
-  userId: string,
-): Activity | null {
-  if (typed.webhookEvent !== "comment_created") return null;
+function normalizeJiraComment(typed: JiraCommentPayload, userId: string): Activity | null {
+  if (typed.webhookEvent !== 'comment_created') return null;
 
   const { comment, issue } = typed;
 
@@ -116,8 +110,8 @@ function normalizeJiraComment(
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "jira",
-    eventType: "comment_created",
+    provider: 'jira',
+    eventType: 'comment_created',
     sourceId: `comment:${comment.id}`,
     title: `[${issue.fields.project.key}] Comment on ${issue.key}: ${issue.fields.summary}`,
     description: comment.body,
@@ -151,23 +145,23 @@ export function normalizeJiraEvent(
   payload: Record<string, unknown>,
   userId: string,
 ): Activity | null {
-  if (typeof payload["webhookEvent"] !== "string") {
+  if (typeof payload['webhookEvent'] !== 'string') {
     return null;
   }
 
-  const webhookEvent = payload["webhookEvent"];
+  const webhookEvent = payload['webhookEvent'];
 
   // ── Comment events ────────────────────────────────────────────────────────
   if (
-    webhookEvent === "comment_created" ||
-    webhookEvent === "comment_updated" ||
-    webhookEvent === "comment_deleted"
+    webhookEvent === 'comment_created' ||
+    webhookEvent === 'comment_updated' ||
+    webhookEvent === 'comment_deleted'
   ) {
     if (
-      payload["comment"] == null ||
-      typeof payload["comment"] !== "object" ||
-      payload["issue"] == null ||
-      typeof payload["issue"] !== "object"
+      payload['comment'] == null ||
+      typeof payload['comment'] !== 'object' ||
+      payload['issue'] == null ||
+      typeof payload['issue'] !== 'object'
     ) {
       return null;
     }
@@ -175,10 +169,7 @@ export function normalizeJiraEvent(
   }
 
   // ── Issue events ──────────────────────────────────────────────────────────
-  if (
-    payload["issue"] == null ||
-    typeof payload["issue"] !== "object"
-  ) {
+  if (payload['issue'] == null || typeof payload['issue'] !== 'object') {
     return null;
   }
 
@@ -191,7 +182,7 @@ export function normalizeJiraEvent(
   const fields = issue.fields;
 
   const occurredAt =
-    eventType === "issue_closed" && fields.resolutiondate != null
+    eventType === 'issue_closed' && fields.resolutiondate != null
       ? fields.resolutiondate
       : fields.updated;
 
@@ -203,7 +194,7 @@ export function normalizeJiraEvent(
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "jira",
+    provider: 'jira',
     eventType,
     sourceId: `issue:${issue.id}:${typed.webhookEvent}`,
     title: `[${fields.project.key}] ${issue.key}: ${fields.summary}`,

@@ -39,15 +39,25 @@ function groupByAgent(items: Activity[]): AgentGroup[] {
     }
   }
 
-  return Array.from(map.entries()).map(([login, groupItems]) => {
-    const prsOpened = groupItems.filter((i) => i.eventType === 'pr_opened').length;
-    const prsMerged = groupItems.filter((i) => i.eventType === 'pr_merged').length;
-    const issuesClosed = groupItems.filter((i) => i.eventType === 'issue_closed').length;
-    const commitsPushed = groupItems.filter((i) => i.eventType === 'commit_pushed').length;
-    const unreviewedPrs = groupItems.filter((i) => i.eventType === 'pr_opened');
+  return Array.from(map.entries())
+    .map(([login, groupItems]) => {
+      const prsOpened = groupItems.filter((i) => i.eventType === 'pr_opened').length;
+      const prsMerged = groupItems.filter((i) => i.eventType === 'pr_merged').length;
+      const issuesClosed = groupItems.filter((i) => i.eventType === 'issue_closed').length;
+      const commitsPushed = groupItems.filter((i) => i.eventType === 'commit_pushed').length;
+      const unreviewedPrs = groupItems.filter((i) => i.eventType === 'pr_opened');
 
-    return { login, items: groupItems, prsOpened, prsMerged, issuesClosed, commitsPushed, unreviewedPrs };
-  }).sort((a, b) => b.items.length - a.items.length);
+      return {
+        login,
+        items: groupItems,
+        prsOpened,
+        prsMerged,
+        issuesClosed,
+        commitsPushed,
+        unreviewedPrs,
+      };
+    })
+    .sort((a, b) => b.items.length - a.items.length);
 }
 
 function computeSummary(groups: AgentGroup[]): BriefingSummary {

@@ -29,11 +29,7 @@ function Stat({ value, label, ariaLabel, highlight }: StatProps) {
 
 export function SummaryBar({ summary }: SummaryBarProps) {
   return (
-    <div
-      className="briefing-summary-bar"
-      aria-label="Morning briefing summary"
-      role="region"
-    >
+    <div className="briefing-summary-bar" aria-label="Morning briefing summary" role="region">
       <Stat
         value={summary.totalPrsMerged}
         label="PRs merged"

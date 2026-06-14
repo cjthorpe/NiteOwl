@@ -12,7 +12,10 @@ function BriefingSkeleton() {
         <div className="briefing-skeleton-card" />
         <div className="briefing-skeleton-card" />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }} aria-hidden="true">
+      <div
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}
+        aria-hidden="true"
+      >
         <div className="briefing-skeleton-group" />
         <div className="briefing-skeleton-group" />
         <div className="briefing-skeleton-group" />

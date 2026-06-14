@@ -31,10 +31,7 @@ export function AgentGroupCard({ group }: AgentGroupCardProps) {
   const unreviewedCount = group.unreviewedPrs.length;
 
   return (
-    <section
-      className="agent-group"
-      aria-label={`Activity for ${group.login}`}
-    >
+    <section className="agent-group" aria-label={`Activity for ${group.login}`}>
       <header className="agent-group-header">
         <div className="agent-group-name">
           <div className="agent-group-avatar" aria-hidden="true">
@@ -110,12 +107,7 @@ export function AgentGroupCard({ group }: AgentGroupCardProps) {
 
               <div className="agent-item-body">
                 <p className="agent-item-title">
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    tabIndex={0}
-                  >
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" tabIndex={0}>
                     {item.title}
                   </a>
                 </p>

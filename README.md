@@ -4,15 +4,15 @@ Monorepo for the NiteOwl application — React/TypeScript frontend, Fastify API,
 
 ## Stack
 
-| Layer | Tech |
-|-------|------|
-| Frontend | React 18, TypeScript (strict), Vite |
-| API | Node.js 22 LTS, Fastify 4, TypeScript |
-| Database | PostgreSQL 16 via Drizzle ORM |
-| Cache / Queue | Redis 7, ioredis |
-| Package manager | pnpm workspaces + Turborepo |
-| Containers | Docker Compose v2 |
-| Deployment | Railway (see `railway.toml`) |
+| Layer           | Tech                                  |
+| --------------- | ------------------------------------- |
+| Frontend        | React 18, TypeScript (strict), Vite   |
+| API             | Node.js 22 LTS, Fastify 4, TypeScript |
+| Database        | PostgreSQL 16 via Drizzle ORM         |
+| Cache / Queue   | Redis 7, ioredis                      |
+| Package manager | pnpm workspaces + Turborepo           |
+| Containers      | Docker Compose v2                     |
+| Deployment      | Railway (see `railway.toml`)          |
 
 ## Monorepo layout
 
@@ -56,13 +56,13 @@ docker compose watch
 
 Services will be available at:
 
-| Service | URL |
-|---------|-----|
-| Web | http://localhost:5173 |
-| API | http://localhost:3001 |
+| Service    | URL                          |
+| ---------- | ---------------------------- |
+| Web        | http://localhost:5173        |
+| API        | http://localhost:3001        |
 | API health | http://localhost:3001/health |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
+| PostgreSQL | localhost:5432               |
+| Redis      | localhost:6379               |
 
 `docker compose watch` uses the `develop.watch` directives in `docker-compose.yml` for hot-reload without volume mounts.
 
@@ -91,14 +91,14 @@ pnpm --filter "@niteowl/db" db:studio
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start all apps in watch mode (Turborepo) |
-| `pnpm build` | Build all packages in dependency order |
-| `pnpm lint` | Run ESLint across the repo |
-| `pnpm format` | Run Prettier |
-| `pnpm typecheck` | TypeScript check (no emit) |
-| `pnpm test` | Run all Vitest suites |
+| Command          | Description                              |
+| ---------------- | ---------------------------------------- |
+| `pnpm dev`       | Start all apps in watch mode (Turborepo) |
+| `pnpm build`     | Build all packages in dependency order   |
+| `pnpm lint`      | Run ESLint across the repo               |
+| `pnpm format`    | Run Prettier                             |
+| `pnpm typecheck` | TypeScript check (no emit)               |
+| `pnpm test`      | Run all Vitest suites                    |
 
 ## Environment variables
 

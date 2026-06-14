@@ -1,9 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import {
-  ALL_INTEGRATIONS,
-  INTEGRATION_LABELS,
-  type Integration,
-} from '../../types/filters';
+import { ALL_INTEGRATIONS, INTEGRATION_LABELS, type Integration } from '../../types/filters';
 
 interface IntegrationFilterProps {
   value: Integration[];
@@ -40,11 +36,7 @@ export function IntegrationFilter({ value, onChange }: IntegrationFilterProps) {
   const selectedCount = value.length;
 
   return (
-    <div
-      ref={containerRef}
-      className="integration-filter"
-      onKeyDown={handleKeyDown}
-    >
+    <div ref={containerRef} className="integration-filter" onKeyDown={handleKeyDown}>
       <span className="filter-label" id={`${triggerId}-label`}>
         Integrations
       </span>
@@ -58,9 +50,7 @@ export function IntegrationFilter({ value, onChange }: IntegrationFilterProps) {
         aria-controls={listId}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span>
-          {selectedCount === 0 ? 'All' : `${selectedCount} selected`}
-        </span>
+        <span>{selectedCount === 0 ? 'All' : `${selectedCount} selected`}</span>
         <svg
           className={`integration-filter__chevron ${open ? 'integration-filter__chevron--open' : ''}`}
           width="12"
@@ -105,10 +95,7 @@ export function IntegrationFilter({ value, onChange }: IntegrationFilterProps) {
                 }}
                 tabIndex={0}
               >
-                <span
-                  className="integration-filter__checkbox"
-                  aria-hidden="true"
-                >
+                <span className="integration-filter__checkbox" aria-hidden="true">
                   {isSelected && (
                     <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                       <path

@@ -1,13 +1,13 @@
-import { Worker } from "bullmq";
-import type { Queue } from "bullmq";
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
-import type { Activity, NormalizationJobData, SlackAlertJobData } from "@niteowl/types";
-import { normalizeEvent } from "../normalizers/index.js";
-import { invalidateFeedCache } from "../routes/feed/index.js";
-import { getEnabledAlertsForUser } from "../routes/slack-alerts/index.js";
+import { Worker } from 'bullmq';
+import type { Queue } from 'bullmq';
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
+import type { Activity, NormalizationJobData, SlackAlertJobData } from '@niteowl/types';
+import { normalizeEvent } from '../normalizers/index.js';
+import { invalidateFeedCache } from '../routes/feed/index.js';
+import { getEnabledAlertsForUser } from '../routes/slack-alerts/index.js';
 
-export const NORMALIZATION_QUEUE = "normalization";
+export const NORMALIZATION_QUEUE = 'normalization';
 
 /**
  * Extracts the actor login / display name from a normalized activity's metadata.
@@ -21,19 +21,17 @@ export const NORMALIZATION_QUEUE = "normalization";
  *
  * Returns null when no recognisable actor field is present.
  */
-export function extractAuthorLogin(
-  metadata: Record<string, unknown>,
-): string | null {
+export function extractAuthorLogin(metadata: Record<string, unknown>): string | null {
   const candidates = [
-    metadata["sender"],
-    metadata["author"],
-    metadata["creator"],
-    metadata["reporter"],
-    metadata["pusher"],
+    metadata['sender'],
+    metadata['author'],
+    metadata['creator'],
+    metadata['reporter'],
+    metadata['pusher'],
   ];
 
   for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim() !== "") {
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
       return candidate;
     }
   }
@@ -100,10 +98,11 @@ export function createNormalizationWorker(
       const activity = normalizeEvent(provider, payload, userId);
 
       if (activity === null) {
-        console.warn(
-          `[normalization-worker] Skipping unrecognised ${provider} event`,
-          { jobId: job.id, provider, userId },
-        );
+        console.warn(`[normalization-worker] Skipping unrecognised ${provider} event`, {
+          jobId: job.id,
+          provider,
+          userId,
+        });
         return;
       }
 
@@ -113,10 +112,7 @@ export function createNormalizationWorker(
         .insert(schema.activityEvents)
         .values(row)
         .onConflictDoNothing({
-          target: [
-            schema.activityEvents.integrationId,
-            schema.activityEvents.externalId,
-          ],
+          target: [schema.activityEvents.integrationId, schema.activityEvents.externalId],
         });
 
       console.info(
@@ -124,35 +120,26 @@ export function createNormalizationWorker(
       );
 
       // ── Slack alerts — enqueue for PR merge events on GitHub ─────────────
-      if (
-        provider === "github" &&
-        activity.eventType === "pr_merged" &&
-        slackAlertQueue !== null
-      ) {
-        void enqueueSlackAlerts(db, activity, slackAlertQueue).catch(
-          (err: unknown) => {
-            console.warn(
-              `[normalization-worker] Slack alert enqueue failed for activity ${activity.id}`,
-              err,
-            );
-          },
-        );
+      if (provider === 'github' && activity.eventType === 'pr_merged' && slackAlertQueue !== null) {
+        void enqueueSlackAlerts(db, activity, slackAlertQueue).catch((err: unknown) => {
+          console.warn(
+            `[normalization-worker] Slack alert enqueue failed for activity ${activity.id}`,
+            err,
+          );
+        });
       }
 
       // Invalidate per-user feed cache so the new event surfaces within 5s.
       // We create a temporary ioredis client using the same connection options
       // so the worker doesn't need a fastify instance reference.
       try {
-        const { default: Redis } = await import("ioredis");
+        const { default: Redis } = await import('ioredis');
         const redis = new Redis(redisOptions);
         await invalidateFeedCache(redis, userId);
         await redis.quit();
       } catch (err) {
         // Cache invalidation is best-effort — a failure here must not block ingestion.
-        console.warn(
-          `[normalization-worker] Cache invalidation failed for user ${userId}`,
-          err,
-        );
+        console.warn(`[normalization-worker] Cache invalidation failed for user ${userId}`, err);
       }
     },
     {
@@ -161,8 +148,8 @@ export function createNormalizationWorker(
     },
   );
 
-  worker.on("failed", (job, err) => {
-    console.error(`[normalization-worker] Job ${job?.id ?? "unknown"} failed`, {
+  worker.on('failed', (job, err) => {
+    console.error(`[normalization-worker] Job ${job?.id ?? 'unknown'} failed`, {
       provider: job?.data.provider,
       error: err.message,
     });
@@ -192,16 +179,12 @@ async function enqueueSlackAlerts(
   queue: Queue<SlackAlertJobData>,
 ): Promise<void> {
   const meta = activity.metadata as Record<string, unknown>;
-  const repo = typeof meta["repo"] === "string" ? meta["repo"] : null;
-  const prNumber =
-    typeof meta["prNumber"] === "number" ? meta["prNumber"] : 0;
+  const repo = typeof meta['repo'] === 'string' ? meta['repo'] : null;
+  const prNumber = typeof meta['prNumber'] === 'number' ? meta['prNumber'] : 0;
   // `author` = PR creator login; `sender` = who triggered the merge action
-  const sender =
-    typeof meta["sender"] === "string" ? meta["sender"] : null;
-  const author =
-    typeof meta["author"] === "string" ? meta["author"] : "unknown";
-  const baseBranch =
-    typeof meta["baseBranch"] === "string" ? meta["baseBranch"] : "main";
+  const sender = typeof meta['sender'] === 'string' ? meta['sender'] : null;
+  const author = typeof meta['author'] === 'string' ? meta['author'] : 'unknown';
+  const baseBranch = typeof meta['baseBranch'] === 'string' ? meta['baseBranch'] : 'main';
 
   if (!repo) {
     console.warn(
@@ -212,12 +195,10 @@ async function enqueueSlackAlerts(
 
   const mergerLogin = sender ?? author; // fall back to author if sender absent
 
-  const alertData: SlackAlertJobData["alertData"] = {
+  const alertData: SlackAlertJobData['alertData'] = {
     repo,
     prNumber,
-    prTitle:
-      activity.title.replace(/^\[.*?\]\s*PR #\d+:\s*/, "").trim() ||
-      activity.title,
+    prTitle: activity.title.replace(/^\[.*?\]\s*PR #\d+:\s*/, '').trim() || activity.title,
     author,
     url: activity.url ?? `https://github.com/${repo}`,
     baseBranch,
@@ -230,9 +211,7 @@ async function enqueueSlackAlerts(
     // watchedRepos filter: empty means "all repos"
     if (
       c.watchedRepos.length > 0 &&
-      !c.watchedRepos.some(
-        (watched) => watched.toLowerCase() === repo.toLowerCase(),
-      )
+      !c.watchedRepos.some((watched) => watched.toLowerCase() === repo.toLowerCase())
     ) {
       return false;
     }
@@ -240,9 +219,7 @@ async function enqueueSlackAlerts(
     // botUserLogins filter: empty means "all mergers"
     if (
       c.botUserLogins.length > 0 &&
-      !c.botUserLogins.some(
-        (login) => login.toLowerCase() === mergerLogin.toLowerCase(),
-      )
+      !c.botUserLogins.some((login) => login.toLowerCase() === mergerLogin.toLowerCase())
     ) {
       return false;
     }
@@ -256,14 +233,14 @@ async function enqueueSlackAlerts(
     matchingConfigs.map((config) =>
       queue
         .add(
-          "send-pr-merge-alert",
+          'send-pr-merge-alert',
           { configId: config.id, userId: activity.userId, alertData },
           // Job-level options override queue defaults when needed — here we
           // rely entirely on the queue's defaultJobOptions (4 attempts, 60s delay).
         )
         .then((job) => {
           console.info(
-            `[normalization-worker] Enqueued slack-alert job ${job.id ?? ""} for config ${config.id}`,
+            `[normalization-worker] Enqueued slack-alert job ${job.id ?? ''} for config ${config.id}`,
           );
         })
         .catch((err: unknown) => {

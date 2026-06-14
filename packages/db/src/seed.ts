@@ -9,32 +9,31 @@
  *   DATABASE_URL=postgres://... pnpm --filter @niteowl/db db:seed
  */
 
-import { createHash } from "crypto";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import * as schema from "./schema";
+import { createHash } from 'crypto';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from './schema';
 
 const DATABASE_URL =
-  process.env["DATABASE_URL"] ??
-  "postgres://niteowl:niteowl_dev_password@localhost:5432/niteowl";
+  process.env['DATABASE_URL'] ?? 'postgres://niteowl:niteowl_dev_password@localhost:5432/niteowl';
 
-const PROVIDERS = ["github", "linear", "jira", "slack"] as const;
+const PROVIDERS = ['github', 'linear', 'jira', 'slack'] as const;
 
-const GITHUB_EVENT_TYPES = ["push", "pull_request", "issue", "review"] as const;
-const LINEAR_EVENT_TYPES = ["issue_created", "issue_updated", "comment"] as const;
-const JIRA_EVENT_TYPES = ["issue_created", "issue_updated", "sprint_started"] as const;
-const SLACK_EVENT_TYPES = ["message", "reaction_added", "channel_joined"] as const;
+const GITHUB_EVENT_TYPES = ['push', 'pull_request', 'issue', 'review'] as const;
+const LINEAR_EVENT_TYPES = ['issue_created', 'issue_updated', 'comment'] as const;
+const JIRA_EVENT_TYPES = ['issue_created', 'issue_updated', 'sprint_started'] as const;
+const SLACK_EVENT_TYPES = ['message', 'reaction_added', 'channel_joined'] as const;
 
 const PROVIDER_SCOPES: Record<string, string> = {
-  github: "repo read:user notifications",
-  linear: "read write",
-  jira: "read:jira-work write:jira-work",
-  slack: "channels:read chat:write reactions:read",
+  github: 'repo read:user notifications',
+  linear: 'read write',
+  jira: 'read:jira-work write:jira-work',
+  slack: 'channels:read chat:write reactions:read',
 };
 
 function randomChoice<T>(arr: readonly T[]): T {
   const idx = Math.floor(Math.random() * arr.length);
-  if (idx >= arr.length) throw new Error("empty array");
+  if (idx >= arr.length) throw new Error('empty array');
   return arr[idx] as T;
 }
 
@@ -46,26 +45,26 @@ function daysAgo(n: number): Date {
 
 /** Placeholder: real code would AES-256-GCM encrypt before storage */
 function fakeEncrypted(value: string): string {
-  return `enc:v1:${Buffer.from(value).toString("base64")}`;
+  return `enc:v1:${Buffer.from(value).toString('base64')}`;
 }
 
 function payloadHash(provider: string, eventId: string): string {
-  return createHash("sha256").update(`${provider}:${eventId}`).digest("hex");
+  return createHash('sha256').update(`${provider}:${eventId}`).digest('hex');
 }
 
 async function seed(): Promise<void> {
   const client = postgres(DATABASE_URL);
   const db = drizzle(client, { schema });
 
-  console.log("Seeding database…");
+  console.log('Seeding database…');
 
   // ------------------------------------------------------------------
   // Users
   // ------------------------------------------------------------------
   const seedUsers = [
-    { email: "alice@example.com", displayName: "Alice" },
-    { email: "bob@example.com", displayName: "Bob" },
-    { email: "carol@example.com", displayName: "Carol" },
+    { email: 'alice@example.com', displayName: 'Alice' },
+    { email: 'bob@example.com', displayName: 'Bob' },
+    { email: 'carol@example.com', displayName: 'Carol' },
   ];
 
   const insertedUsers = await db
@@ -77,7 +76,7 @@ async function seed(): Promise<void> {
   console.log(`  users: ${insertedUsers.length} inserted`);
 
   if (insertedUsers.length === 0) {
-    console.log("  Data already present — skipping remaining seed steps.");
+    console.log('  Data already present — skipping remaining seed steps.');
     await client.end();
     return;
   }
@@ -170,15 +169,13 @@ async function seed(): Promise<void> {
   // ------------------------------------------------------------------
   // Slack alert configs (one per user)
   // ------------------------------------------------------------------
-  const slackConfigRows: schema.NewSlackAlertConfig[] = insertedUsers.map(
-    (user) => ({
-      userId: user.id,
-      webhookUrlEncrypted: fakeEncrypted(
-        `https://hooks.slack.com/services/T00000/${user.id.slice(0, 8)}`,
-      ),
-      watchedRepos: ["niteowl/api", "niteowl/web"],
-    }),
-  );
+  const slackConfigRows: schema.NewSlackAlertConfig[] = insertedUsers.map((user) => ({
+    userId: user.id,
+    webhookUrlEncrypted: fakeEncrypted(
+      `https://hooks.slack.com/services/T00000/${user.id.slice(0, 8)}`,
+    ),
+    watchedRepos: ['niteowl/api', 'niteowl/web'],
+  }));
 
   const insertedSlackConfigs = await db
     .insert(schema.slackAlertConfigs)
@@ -195,7 +192,7 @@ async function seed(): Promise<void> {
     provider: a.provider,
     payloadHash: payloadHash(a.provider, a.externalId),
     eventType: a.eventType,
-    status: "processed" as const,
+    status: 'processed' as const,
     processedAt: new Date(),
   }));
 
@@ -208,10 +205,10 @@ async function seed(): Promise<void> {
   console.log(`  webhook_events: ${insertedWebhooks.length} inserted`);
 
   await client.end();
-  console.log("Seed complete.");
+  console.log('Seed complete.');
 }
 
 seed().catch((err: unknown) => {
-  console.error("Seed failed:", err);
+  console.error('Seed failed:', err);
   process.exit(1);
 });

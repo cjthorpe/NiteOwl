@@ -64,10 +64,7 @@ export function Integrations() {
       </div>
 
       {/* Footer note */}
-      <p
-        className="mt-8 text-xs"
-        style={{ color: 'var(--color-text-subtle)' }}
-      >
+      <p className="mt-8 text-xs" style={{ color: 'var(--color-text-subtle)' }}>
         More integrations — Slack, Jira — coming soon.
       </p>
     </section>

@@ -1,6 +1,6 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
@@ -8,4 +8,4 @@ onlyBuiltDependencies:
   - esbuild
   - msgpackr-extract
 overrides:
-  esbuild: ">=0.28.1"
+  esbuild: '>=0.28.1'
