@@ -149,5 +149,11 @@ export function buildApp(opts: BuildAppOptions = {}) {
   // User profile (JWT-derived, no DB hit)
   app.register(usersRoutes, { prefix: '/api/users' });
 
+  // Agent login registry
+  app.register(agentLoginRoutes, { prefix: "/api/agent-logins", db });
+
+  // User profile (JWT-derived, no DB hit)
+  app.register(usersRoutes, { prefix: "/api/users" });
+
   return app;
 }

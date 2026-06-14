@@ -190,6 +190,10 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         conditions.push(eq(schema.activityEvents.authorLogin, author));
       }
 
+      if (author) {
+        conditions.push(eq(schema.activityEvents.authorLogin, author));
+      }
+
       // cursor: events strictly before (occurredAt, id)
       const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
       if (cursor) {
