@@ -1,11 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
 export function Login() {
-  const navigate = useNavigate();
-
-  function handleDevLogin() {
-    localStorage.setItem('niteowl:auth', 'true');
-    navigate('/dashboard');
+  function handleGitHubLogin() {
+    window.location.href = `${API_URL}/auth/github`;
   }
 
   return (
@@ -62,10 +60,9 @@ export function Login() {
             gap: 'var(--space-4)',
           }}
         >
-          {/* GitHub OAuth placeholder */}
           <button
             type="button"
-            onClick={handleDevLogin}
+            onClick={handleGitHubLogin}
             style={{
               display: 'flex',
               alignItems: 'center',

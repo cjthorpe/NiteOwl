@@ -1,5 +1,6 @@
 import type { Activity, ActivityProvider } from '@niteowl/types';
 import type { EventType } from '../types/filters';
+import { getAuthHeaders } from './auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
@@ -30,6 +31,7 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
 
   const res = await fetch(url.toString(), {
     credentials: 'include',
+    headers: getAuthHeaders(),
   });
 
   if (!res.ok) {
@@ -72,7 +74,7 @@ export async function fetchBriefingItems(params: BriefingFeedParams): Promise<Ac
       url.searchParams.set('cursor', cursor);
     }
 
-    const res = await fetch(url.toString(), { credentials: 'include' });
+    const res = await fetch(url.toString(), { credentials: 'include', headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`Feed request failed: ${res.status}`);
 
     const json = (await res.json()) as {
