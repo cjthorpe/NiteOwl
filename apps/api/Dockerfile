@@ -11,6 +11,7 @@ RUN corepack enable && corepack prepare pnpm@11.6.0 --activate
 FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/types/package.json ./packages/types/
 COPY packages/db/package.json ./packages/db/
@@ -44,6 +45,7 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.6.0 --activate
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/types/package.json ./packages/types/
 COPY packages/db/package.json ./packages/db/
