@@ -3,9 +3,9 @@
  * inserts them into activity_events, respecting X-RateLimit-* headers.
  */
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
-import { normalizeGitHubEvent } from "../normalizers/github.js";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
+import { normalizeGitHubEvent } from '../normalizers/github.js';
 
 // ---------------------------------------------------------------------------
 // GitHub Events API types (minimal surface we care about)
@@ -31,9 +31,9 @@ interface RateLimitInfo {
 // ---------------------------------------------------------------------------
 
 function parseRateLimit(headers: Headers): RateLimitInfo {
-  const remaining = parseInt(headers.get("x-ratelimit-remaining") ?? "60", 10);
+  const remaining = parseInt(headers.get('x-ratelimit-remaining') ?? '60', 10);
   const reset = parseInt(
-    headers.get("x-ratelimit-reset") ?? String(Math.floor(Date.now() / 1000) + 60),
+    headers.get('x-ratelimit-reset') ?? String(Math.floor(Date.now() / 1000) + 60),
     10,
   );
   return { remaining, reset };
@@ -43,10 +43,7 @@ function parseRateLimit(headers: Headers): RateLimitInfo {
  * When fewer than `threshold` requests remain in the current window, sleep
  * until the reset timestamp plus a small buffer.
  */
-async function respectRateLimit(
-  info: RateLimitInfo,
-  threshold = 5,
-): Promise<void> {
+async function respectRateLimit(info: RateLimitInfo, threshold = 5): Promise<void> {
   if (info.remaining < threshold) {
     const nowMs = Date.now();
     const resetMs = info.reset * 1000;
@@ -68,8 +65,8 @@ async function fetchGitHubPage(
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
     },
   });
 
@@ -85,7 +82,7 @@ async function fetchGitHubPage(
   const events = (await res.json()) as GitHubEvent[];
 
   // GitHub uses RFC 5988 Link headers for pagination: <url>; rel="next"
-  const linkHeader = res.headers.get("link") ?? "";
+  const linkHeader = res.headers.get('link') ?? '';
   const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
   const nextUrl = nextMatch?.[1] ?? null;
 
@@ -120,17 +117,8 @@ export interface CatchupResult {
  *
  * Handles pagination and respects X-RateLimit-* headers.
  */
-export async function runGitHubCatchup(
-  opts: CatchupOptions,
-): Promise<CatchupResult> {
-  const {
-    db,
-    userId,
-    integrationId,
-    githubLogin,
-    accessToken,
-    lookbackHours = 24,
-  } = opts;
+export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupResult> {
+  const { db, userId, integrationId, githubLogin, accessToken, lookbackHours = 24 } = opts;
 
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
 
@@ -151,10 +139,7 @@ export async function runGitHubCatchup(
     let url: string | null = startUrl;
 
     while (url !== null) {
-      const { events, nextUrl, rateLimit } = await fetchGitHubPage(
-        url,
-        accessToken,
-      );
+      const { events, nextUrl, rateLimit } = await fetchGitHubPage(url, accessToken);
 
       totalFetched += events.length;
 
@@ -168,10 +153,7 @@ export async function runGitHubCatchup(
       }
 
       for (const event of recent) {
-        const activity = normalizeGitHubEvent(
-          enrichPayload(event),
-          userId,
-        );
+        const activity = normalizeGitHubEvent(enrichPayload(event), userId);
 
         if (activity === null) {
           totalSkipped++;
@@ -184,7 +166,7 @@ export async function runGitHubCatchup(
             id: activity.id,
             userId,
             integrationId,
-            provider: "github",
+            provider: 'github',
             eventType: activity.eventType,
             externalId: activity.sourceId,
             title: activity.title,
@@ -193,10 +175,7 @@ export async function runGitHubCatchup(
             occurredAt: new Date(activity.occurredAt),
           })
           .onConflictDoNothing({
-            target: [
-              schema.activityEvents.integrationId,
-              schema.activityEvents.externalId,
-            ],
+            target: [schema.activityEvents.integrationId, schema.activityEvents.externalId],
           })
           .returning({ id: schema.activityEvents.id });
 
@@ -234,19 +213,19 @@ export async function runGitHubCatchup(
 function enrichPayload(event: GitHubEvent): Record<string, unknown> {
   const base: Record<string, unknown> = {
     ...event.payload,
-    repository: event.payload["repository"] ?? {
+    repository: event.payload['repository'] ?? {
       full_name: event.repo.name,
       html_url: `https://github.com/${event.repo.name}`,
     },
-    sender: event.payload["sender"] ?? {
+    sender: event.payload['sender'] ?? {
       login: event.actor.login,
       id: event.actor.id,
     },
   };
 
   // For push events, ensure the `pusher` field is present
-  if (event.type === "PushEvent" && !base["pusher"]) {
-    base["pusher"] = { name: event.actor.login };
+  if (event.type === 'PushEvent' && !base['pusher']) {
+    base['pusher'] = { name: event.actor.login };
   }
 
   return base;

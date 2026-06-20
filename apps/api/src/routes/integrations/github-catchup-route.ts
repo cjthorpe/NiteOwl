@@ -1,10 +1,10 @@
-import { and, eq } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import { and, eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
-import { requireAuth } from "../../plugins/auth.js";
+import { requireAuth } from '../../plugins/auth.js';
 
 // ---------------------------------------------------------------------------
 // GitHub REST API types (minimal surface for catchup)
@@ -31,7 +31,7 @@ interface GitHubPullRequest {
   number: number;
   title: string;
   html_url: string;
-  state: "open" | "closed";
+  state: 'open' | 'closed';
   merged_at: string | null;
   updated_at: string;
   user: { login: string };
@@ -45,23 +45,19 @@ interface GitHubPullRequest {
 const MAX_RETRIES = 4;
 const BASE_DELAY_MS = 1_000;
 
-export async function fetchWithBackoff(
-  url: string,
-  token: string,
-  attempt = 0,
-): Promise<Response> {
+export async function fetchWithBackoff(url: string, token: string, attempt = 0): Promise<Response> {
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
     },
   });
 
   if ((res.status === 429 || res.status === 403) && attempt < MAX_RETRIES) {
     // Honour Retry-After when GitHub supplies it; otherwise exponential backoff.
     // A header value of "0" means "retry immediately" per RFC 7231 §7.1.3.
-    const retryAfterHeader = res.headers.get("retry-after");
+    const retryAfterHeader = res.headers.get('retry-after');
     const delayMs =
       retryAfterHeader !== null
         ? parseInt(retryAfterHeader, 10) * 1_000
@@ -78,10 +74,7 @@ export async function fetchWithBackoff(
 // Paginated fetcher — follows RFC 5988 Link headers
 // ---------------------------------------------------------------------------
 
-export async function fetchAllPages<T>(
-  firstUrl: string,
-  token: string,
-): Promise<T[]> {
+export async function fetchAllPages<T>(firstUrl: string, token: string): Promise<T[]> {
   const results: T[] = [];
   let url: string | null = firstUrl;
 
@@ -96,7 +89,7 @@ export async function fetchAllPages<T>(
     const page = (await res.json()) as T[];
     results.push(...page);
 
-    const link = res.headers.get("link") ?? "";
+    const link = res.headers.get('link') ?? '';
     const nextMatch = link.match(/<([^>]+)>;\s*rel="next"/);
     url = nextMatch?.[1] ?? null;
   }
@@ -117,10 +110,7 @@ interface CatchUpBody {
 // Route plugin
 // ---------------------------------------------------------------------------
 
-export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
-  fastify,
-  { db },
-) => {
+export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
   /**
    * POST /api/integrations/github/:installationId/catch-up
    *
@@ -135,10 +125,10 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
     Params: { installationId: string };
     Body: CatchUpBody;
   }>(
-    "/github/:installationId/catch-up",
+    '/github/:installationId/catch-up',
     {
       preHandler: requireAuth,
-      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     },
     async (request, reply) => {
       const userId = request.user!.sub;
@@ -146,16 +136,10 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
       const { since, until } = request.body ?? {};
 
       // ── Validate time window ─────────────────────────────────────────────────
-      if (
-        !since ||
-        !until ||
-        isNaN(Date.parse(since)) ||
-        isNaN(Date.parse(until))
-      ) {
+      if (!since || !until || isNaN(Date.parse(since)) || isNaN(Date.parse(until))) {
         return reply.code(400).send({
           success: false,
-          error:
-            "Body must include valid ISO 8601 `since` and `until` timestamps",
+          error: 'Body must include valid ISO 8601 `since` and `until` timestamps',
         });
       }
 
@@ -165,7 +149,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
       if (sinceDate >= untilDate) {
         return reply.code(400).send({
           success: false,
-          error: "`since` must be before `until`",
+          error: '`since` must be before `until`',
         });
       }
 
@@ -177,7 +161,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
           and(
             eq(schema.integrations.id, installationId),
             eq(schema.integrations.userId, userId),
-            eq(schema.integrations.provider, "github"),
+            eq(schema.integrations.provider, 'github'),
             eq(schema.integrations.enabled, true),
           ),
         )
@@ -186,7 +170,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
       if (!integration) {
         return reply.code(404).send({
           success: false,
-          error: "No enabled GitHub integration found for this installation ID",
+          error: 'No enabled GitHub integration found for this installation ID',
         });
       }
 
@@ -197,17 +181,14 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
         })
         .from(schema.oauthTokens)
         .where(
-          and(
-            eq(schema.oauthTokens.userId, userId),
-            eq(schema.oauthTokens.provider, "github"),
-          ),
+          and(eq(schema.oauthTokens.userId, userId), eq(schema.oauthTokens.provider, 'github')),
         )
         .limit(1);
 
       if (!tokenRow) {
         return reply.code(404).send({
           success: false,
-          error: "No GitHub OAuth token found",
+          error: 'No GitHub OAuth token found',
         });
       }
 
@@ -217,13 +198,12 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
       let repos: GitHubRepo[];
       try {
         repos = await fetchAllPages<GitHubRepo>(
-          "https://api.github.com/user/repos?sort=pushed&direction=desc&per_page=100",
+          'https://api.github.com/user/repos?sort=pushed&direction=desc&per_page=100',
           accessToken,
         );
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "fetch_repos_failed";
-        request.log.error({ error: message }, "[github-catchup] Failed to fetch repos");
+        const message = err instanceof Error ? err.message : 'fetch_repos_failed';
+        request.log.error({ error: message }, '[github-catchup] Failed to fetch repos');
         return reply.code(502).send({ success: false, error: message });
       }
 
@@ -253,11 +233,11 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
             rows.push({
               userId,
               integrationId: integration.id,
-              provider: "github",
-              eventType: "commit_pushed",
+              provider: 'github',
+              eventType: 'commit_pushed',
               // Dedup key: commit SHA is globally unique within a repo.
               externalId: `commit:${commit.sha}`,
-              title: `[${repoName}] ${commit.commit.message.split("\n")[0]}`,
+              title: `[${repoName}] ${commit.commit.message.split('\n')[0]}`,
               url: commit.html_url,
               metadata: {
                 sha: commit.sha,
@@ -272,7 +252,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
           // Log and continue — one failing repo should not abort the whole run.
           request.log.warn(
             { repo: repoName, err },
-            "[github-catchup] Failed to fetch commits — skipping repo",
+            '[github-catchup] Failed to fetch commits — skipping repo',
           );
         }
 
@@ -289,21 +269,17 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
             if (updatedAt < sinceDate || updatedAt > untilDate) continue;
 
             const eventType =
-              pr.state === "open"
-                ? "pr_opened"
-                : pr.merged_at !== null
-                  ? "pr_merged"
-                  : "pr_closed";
+              pr.state === 'open' ? 'pr_opened' : pr.merged_at !== null ? 'pr_merged' : 'pr_closed';
 
             const occurredAt =
-              eventType === "pr_merged" && pr.merged_at !== null
+              eventType === 'pr_merged' && pr.merged_at !== null
                 ? new Date(pr.merged_at)
                 : updatedAt;
 
             rows.push({
               userId,
               integrationId: integration.id,
-              provider: "github",
+              provider: 'github',
               eventType,
               // Suffix distinguishes catch-up entries from webhook-generated ones,
               // while still ensuring a single dedup key per PR per integration.
@@ -323,7 +299,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
         } catch (err) {
           request.log.warn(
             { repo: repoName, err },
-            "[github-catchup] Failed to fetch PRs — skipping repo",
+            '[github-catchup] Failed to fetch PRs — skipping repo',
           );
         }
       }

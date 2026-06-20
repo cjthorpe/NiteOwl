@@ -25,27 +25,27 @@ export interface PaginatedResponse<T> {
 }
 
 export interface HealthStatus {
-  status: "ok" | "degraded" | "down";
+  status: 'ok' | 'degraded' | 'down';
   timestamp: Timestamp;
   services: {
-    db: "ok" | "error";
-    redis: "ok" | "error";
+    db: 'ok' | 'error';
+    redis: 'ok' | 'error';
   };
 }
 
 // Activity normalization types
 
-export type ActivityProvider = "github" | "linear" | "jira" | "slack";
+export type ActivityProvider = 'github' | 'linear' | 'jira' | 'slack';
 
 export type ActivityEventType =
-  | "pr_opened"
-  | "pr_merged"
-  | "pr_closed"
-  | "commit_pushed"
-  | "issue_opened"
-  | "issue_closed"
-  | "issue_updated"
-  | "comment_created";
+  | 'pr_opened'
+  | 'pr_merged'
+  | 'pr_closed'
+  | 'commit_pushed'
+  | 'issue_opened'
+  | 'issue_closed'
+  | 'issue_updated'
+  | 'comment_created';
 
 export interface Activity {
   id: string;

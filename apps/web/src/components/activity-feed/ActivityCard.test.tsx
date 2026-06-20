@@ -70,7 +70,9 @@ describe('ActivityCard', () => {
   });
 
   it('renders issue_opened badge with correct label', () => {
-    render(<ActivityCard activity={makeActivity({ provider: 'linear', eventType: 'issue_opened' })} />);
+    render(
+      <ActivityCard activity={makeActivity({ provider: 'linear', eventType: 'issue_opened' })} />,
+    );
     expect(screen.getByText('Issue opened')).toBeInTheDocument();
   });
 });

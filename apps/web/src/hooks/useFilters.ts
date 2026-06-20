@@ -20,16 +20,12 @@ function isTimeRange(value: string): value is TimeRange {
 
 function parseIntegrations(raw: string | null): Integration[] {
   if (!raw) return [];
-  return raw
-    .split(',')
-    .filter((v): v is Integration => (ALL_INTEGRATIONS as string[]).includes(v));
+  return raw.split(',').filter((v): v is Integration => (ALL_INTEGRATIONS as string[]).includes(v));
 }
 
 function parseEventTypes(raw: string | null): EventType[] {
   if (!raw) return [];
-  return raw
-    .split(',')
-    .filter((v): v is EventType => (ALL_EVENT_TYPES as string[]).includes(v));
+  return raw.split(',').filter((v): v is EventType => (ALL_EVENT_TYPES as string[]).includes(v));
 }
 
 export interface UseFiltersReturn {
@@ -47,16 +43,15 @@ export function useFilters(): UseFiltersReturn {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const rawTime = searchParams.get(PARAM_TIME);
-  const timeRange: TimeRange = rawTime && isTimeRange(rawTime) ? rawTime : DEFAULT_FILTERS.timeRange;
+  const timeRange: TimeRange =
+    rawTime && isTimeRange(rawTime) ? rawTime : DEFAULT_FILTERS.timeRange;
   const integrations = parseIntegrations(searchParams.get(PARAM_INTEGRATIONS));
   const eventTypes = parseEventTypes(searchParams.get(PARAM_EVENTS));
 
   const filters: FilterState = { timeRange, integrations, eventTypes };
 
   const hasActiveFilters =
-    timeRange !== DEFAULT_FILTERS.timeRange ||
-    integrations.length > 0 ||
-    eventTypes.length > 0;
+    timeRange !== DEFAULT_FILTERS.timeRange || integrations.length > 0 || eventTypes.length > 0;
 
   const setTimeRange = useCallback(
     (range: TimeRange) => {

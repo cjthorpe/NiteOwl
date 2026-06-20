@@ -32,21 +32,14 @@ export function ActivityCard({ activity }: ActivityCardProps) {
   return (
     <article className="activity-card">
       <div className="activity-card-icon-col">
-        <div
-          className="activity-card-icon"
-          data-provider={activity.provider}
-          aria-hidden="true"
-        >
+        <div className="activity-card-icon" data-provider={activity.provider} aria-hidden="true">
           <ProviderLogo provider={activity.provider} size={16} />
         </div>
       </div>
 
       <div className="activity-card-body">
         <div className="activity-card-meta">
-          <span
-            className="activity-card-badge"
-            data-event={activity.eventType}
-          >
+          <span className="activity-card-badge" data-event={activity.eventType}>
             {label}
           </span>
           {repo && (

@@ -100,12 +100,8 @@
           "name": "activities_user_id_users_id_fk",
           "tableFrom": "activities",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -115,11 +111,7 @@
         "activities_user_provider_source_uniq": {
           "name": "activities_user_provider_source_uniq",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "provider",
-            "source_id"
-          ]
+          "columns": ["user_id", "provider", "source_id"]
         }
       },
       "policies": {},
@@ -182,12 +174,8 @@
           "name": "integrations_user_id_users_id_fk",
           "tableFrom": "integrations",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -261,12 +249,8 @@
           "name": "oauth_tokens_user_id_users_id_fk",
           "tableFrom": "oauth_tokens",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -351,12 +335,8 @@
           "name": "refresh_tokens_user_id_users_id_fk",
           "tableFrom": "refresh_tokens",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -431,16 +411,12 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         },
         "users_github_id_unique": {
           "name": "users_github_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "github_id"
-          ]
+          "columns": ["github_id"]
         }
       },
       "policies": {},
@@ -534,10 +510,7 @@
         "webhook_events_provider_hash_uniq": {
           "name": "webhook_events_provider_hash_uniq",
           "nullsNotDistinct": false,
-          "columns": [
-            "provider",
-            "payload_hash"
-          ]
+          "columns": ["provider", "payload_hash"]
         }
       },
       "policies": {},
@@ -549,22 +522,12 @@
     "public.provider": {
       "name": "provider",
       "schema": "public",
-      "values": [
-        "github",
-        "linear",
-        "jira",
-        "slack"
-      ]
+      "values": ["github", "linear", "jira", "slack"]
     },
     "public.webhook_event_status": {
       "name": "webhook_event_status",
       "schema": "public",
-      "values": [
-        "received",
-        "processed",
-        "failed",
-        "duplicate"
-      ]
+      "values": ["received", "processed", "failed", "duplicate"]
     }
   },
   "schemas": {},

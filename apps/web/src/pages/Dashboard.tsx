@@ -48,11 +48,7 @@ export function Dashboard() {
         Dashboard
       </h1>
 
-      <div
-        className="dashboard-mode-toggle"
-        role="group"
-        aria-label="Dashboard view mode"
-      >
+      <div className="dashboard-mode-toggle" role="group" aria-label="Dashboard view mode">
         <button
           type="button"
           className="mode-toggle-btn"

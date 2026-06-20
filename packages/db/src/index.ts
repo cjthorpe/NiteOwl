@@ -1,9 +1,9 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import * as schema from "./schema";
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from './schema';
 
 export { schema };
-export { encrypt, decrypt, encryptOptional, decryptOptional } from "./encryption.js";
+export { encrypt, decrypt, encryptOptional, decryptOptional } from './encryption.js';
 
 export type {
   ActivityEvent,
@@ -21,7 +21,7 @@ export type {
   User,
   WebhookEvent,
   WebhookEventStatus,
-} from "./schema";
+} from './schema';
 
 export function createDb(connectionString: string) {
   const client = postgres(connectionString);

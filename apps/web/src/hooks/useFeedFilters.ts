@@ -20,9 +20,7 @@ function parseHours(raw: string | null): TimeHours {
 function parseProviders(raw: string | null): ActivityProvider[] {
   if (!raw) return [];
   const valid: ActivityProvider[] = ['github', 'linear', 'jira', 'slack'];
-  return raw
-    .split(',')
-    .filter((p): p is ActivityProvider => valid.includes(p as ActivityProvider));
+  return raw.split(',').filter((p): p is ActivityProvider => valid.includes(p as ActivityProvider));
 }
 
 export function useFeedFilters(): {
@@ -56,9 +54,7 @@ export function useFeedFilters(): {
       setParams((prev) => {
         const next = new URLSearchParams(prev);
         const current = parseProviders(prev.get('provider'));
-        const updated = current.includes(p)
-          ? current.filter((x) => x !== p)
-          : [...current, p];
+        const updated = current.includes(p) ? current.filter((x) => x !== p) : [...current, p];
         if (updated.length === 0) {
           next.delete('provider');
         } else {

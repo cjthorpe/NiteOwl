@@ -1,13 +1,13 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import { and, eq, gt, isNull } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
-import { generateOAuthState, sha256, timingSafeCompare } from "../../lib/crypto.js";
-import { REFRESH_COOKIE } from "./constants.js";
+import { generateOAuthState, sha256, timingSafeCompare } from '../../lib/crypto.js';
+import { REFRESH_COOKIE } from './constants.js';
 
-const STATE_COOKIE = "niteowl_linear_state";
+const STATE_COOKIE = 'niteowl_linear_state';
 
 interface LinearTokenResponse {
   access_token: string;
@@ -27,25 +27,22 @@ interface LinearViewer {
   };
 }
 
-async function exchangeLinearCode(
-  code: string,
-  redirectUri: string,
-): Promise<LinearTokenResponse> {
-  const clientId = process.env["LINEAR_CLIENT_ID"];
-  const clientSecret = process.env["LINEAR_CLIENT_SECRET"];
+async function exchangeLinearCode(code: string, redirectUri: string): Promise<LinearTokenResponse> {
+  const clientId = process.env['LINEAR_CLIENT_ID'];
+  const clientSecret = process.env['LINEAR_CLIENT_SECRET'];
   if (!clientId || !clientSecret) {
-    throw new Error("Linear OAuth not configured");
+    throw new Error('Linear OAuth not configured');
   }
 
-  const res = await fetch("https://api.linear.app/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const res = await fetch('https://api.linear.app/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       code,
       redirect_uri: redirectUri,
       client_id: clientId,
       client_secret: clientSecret,
-      grant_type: "authorization_code",
+      grant_type: 'authorization_code',
     }).toString(),
   });
 
@@ -58,18 +55,18 @@ async function exchangeLinearCode(
 }
 
 async function getLinearViewer(accessToken: string): Promise<LinearViewer> {
-  const res = await fetch("https://api.linear.app/graphql", {
-    method: "POST",
+  const res = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       query: `query { viewer { id name email organization { id name urlKey } } }`,
     }),
   });
 
-  if (!res.ok) throw new Error("Failed to fetch Linear viewer");
+  if (!res.ok) throw new Error('Failed to fetch Linear viewer');
 
   const data = (await res.json()) as {
     data?: { viewer?: LinearViewer };
@@ -77,31 +74,26 @@ async function getLinearViewer(accessToken: string): Promise<LinearViewer> {
   };
 
   if (data.errors || !data.data?.viewer) {
-    throw new Error("GraphQL error fetching Linear viewer");
+    throw new Error('GraphQL error fetching Linear viewer');
   }
 
   return data.data.viewer;
 }
 
-export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
-  fastify,
-  { db },
-) => {
-  const apiUrl = process.env["API_URL"] ?? "http://localhost:3000";
+export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
+  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3000';
   const redirectUri = `${apiUrl}/auth/linear/callback`;
 
   // ── GET /auth/linear ── Initiate Linear OAuth ─────────────────────────────
   fastify.get(
-    "/linear",
-    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    '/linear',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
     async (request, reply) => {
-      const clientId = process.env["LINEAR_CLIENT_ID"];
-      const webRoot = process.env["WEB_URL"] ?? "http://localhost:5173";
+      const clientId = process.env['LINEAR_CLIENT_ID'];
+      const webRoot = process.env['WEB_URL'] ?? 'http://localhost:5173';
 
       if (!clientId) {
-        return reply
-          .code(503)
-          .send({ success: false, error: "Linear OAuth not configured" });
+        return reply.code(503).send({ success: false, error: 'Linear OAuth not configured' });
       }
 
       // Resolve the authenticated user: first try the Bearer token, then fall
@@ -141,24 +133,21 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
 
       reply.setCookie(STATE_COOKIE, stateCookieValue, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: process.env["NODE_ENV"] === "production",
-        path: "/auth/linear",
+        sameSite: 'lax',
+        secure: process.env['NODE_ENV'] === 'production',
+        path: '/auth/linear',
         maxAge: 900, // 15 minutes
       });
 
       const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri,
-        response_type: "code",
-        scope: "read",
+        response_type: 'code',
+        scope: 'read',
         state,
       });
 
-      return reply.redirect(
-        `https://linear.app/oauth/authorize?${params.toString()}`,
-        302,
-      );
+      return reply.redirect(`https://linear.app/oauth/authorize?${params.toString()}`, 302);
     },
   );
 
@@ -166,11 +155,11 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
   fastify.get<{
     Querystring: { code?: string; state?: string; error?: string };
   }>(
-    "/linear/callback",
-    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    '/linear/callback',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const { code, state, error } = request.query;
-      const webRoot = process.env["WEB_URL"] ?? "http://localhost:5173";
+      const webRoot = process.env['WEB_URL'] ?? 'http://localhost:5173';
       const successRedirect = `${webRoot}/auth/callback?provider=linear&status=success`;
       const errorRedirect = (msg: string) =>
         `${webRoot}/auth/callback?provider=linear&status=error&error=${encodeURIComponent(msg)}`;
@@ -195,13 +184,13 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
       }
 
       if (!state || !storedState || !timingSafeCompare(state, storedState)) {
-        return reply.redirect(errorRedirect("state_mismatch"), 302);
+        return reply.redirect(errorRedirect('state_mismatch'), 302);
       }
 
-      reply.clearCookie(STATE_COOKIE, { path: "/auth/linear" });
+      reply.clearCookie(STATE_COOKIE, { path: '/auth/linear' });
 
       if (!code) {
-        return reply.redirect(errorRedirect("no_code"), 302);
+        return reply.redirect(errorRedirect('no_code'), 302);
       }
 
       // Resolve userId: prefer Bearer token, fall back to cookie-embedded userId
@@ -213,18 +202,14 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
       try {
         const tokenData = await exchangeLinearCode(code, redirectUri);
         const viewer = await getLinearViewer(tokenData.access_token);
-        const { id: organizationId, name: organizationName } =
-          viewer.organization;
+        const { id: organizationId, name: organizationName } = viewer.organization;
 
         // Upsert integration record
         const [existing] = await db
           .select({ id: schema.integrations.id })
           .from(schema.integrations)
           .where(
-            and(
-              eq(schema.integrations.userId, userId),
-              eq(schema.integrations.provider, "linear"),
-            ),
+            and(eq(schema.integrations.userId, userId), eq(schema.integrations.provider, 'linear')),
           )
           .limit(1);
 
@@ -240,7 +225,7 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         } else {
           await db.insert(schema.integrations).values({
             userId,
-            provider: "linear",
+            provider: 'linear',
             configJson: { organizationId, organizationName },
             enabled: true,
           });
@@ -250,18 +235,13 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         // NOTE: accessTokenEncrypted stores the raw token here.
         // In production this should be AES-256-GCM encrypted at the app layer.
         const tokenExpiresAt =
-          tokenData.expires_in != null
-            ? new Date(Date.now() + tokenData.expires_in * 1000)
-            : null;
+          tokenData.expires_in != null ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
 
         const [existingToken] = await db
           .select({ id: schema.oauthTokens.id })
           .from(schema.oauthTokens)
           .where(
-            and(
-              eq(schema.oauthTokens.userId, userId),
-              eq(schema.oauthTokens.provider, "linear"),
-            ),
+            and(eq(schema.oauthTokens.userId, userId), eq(schema.oauthTokens.provider, 'linear')),
           )
           .limit(1);
 
@@ -278,7 +258,7 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
         } else {
           await db.insert(schema.oauthTokens).values({
             userId,
-            provider: "linear",
+            provider: 'linear',
             accessTokenEncrypted: tokenData.access_token,
             scopes: tokenData.scope,
             ...(tokenExpiresAt != null ? { expiresAt: tokenExpiresAt } : {}),
@@ -289,8 +269,8 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (
       } catch (err) {
         // Log the real error server-side; never expose internal details
         // (API error bodies, stack traces, etc.) in the redirect URL.
-        fastify.log.error({ err }, "Linear OAuth callback error");
-        return reply.redirect(errorRedirect("server_error"), 302);
+        fastify.log.error({ err }, 'Linear OAuth callback error');
+        return reply.redirect(errorRedirect('server_error'), 302);
       }
     },
   );

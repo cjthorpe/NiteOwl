@@ -1,13 +1,13 @@
-export { normalizeGitHubEvent } from "./github.js";
-export { normalizeJiraEvent } from "./jira.js";
-export { normalizeLinearEvent } from "./linear.js";
-export { normalizeSlackEvent } from "./slack.js";
+export { normalizeGitHubEvent } from './github.js';
+export { normalizeJiraEvent } from './jira.js';
+export { normalizeLinearEvent } from './linear.js';
+export { normalizeSlackEvent } from './slack.js';
 
-import type { Activity, ActivityProvider } from "@niteowl/types";
-import { normalizeGitHubEvent } from "./github.js";
-import { normalizeJiraEvent } from "./jira.js";
-import { normalizeLinearEvent } from "./linear.js";
-import { normalizeSlackEvent } from "./slack.js";
+import type { Activity, ActivityProvider } from '@niteowl/types';
+import { normalizeGitHubEvent } from './github.js';
+import { normalizeJiraEvent } from './jira.js';
+import { normalizeLinearEvent } from './linear.js';
+import { normalizeSlackEvent } from './slack.js';
 
 /**
  * Dispatch table — routes raw payloads to the correct normalizer.
@@ -19,13 +19,13 @@ export function normalizeEvent(
   userId: string,
 ): Activity | null {
   switch (provider) {
-    case "github":
+    case 'github':
       return normalizeGitHubEvent(payload, userId);
-    case "linear":
+    case 'linear':
       return normalizeLinearEvent(payload, userId);
-    case "jira":
+    case 'jira':
       return normalizeJiraEvent(payload, userId);
-    case "slack":
+    case 'slack':
       return normalizeSlackEvent(payload, userId);
   }
 }

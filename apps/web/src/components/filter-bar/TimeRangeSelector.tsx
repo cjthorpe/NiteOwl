@@ -12,7 +12,11 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
   return (
     <fieldset className="time-range-selector" aria-label="Time range">
       <legend className="filter-label">Time range</legend>
-      <div className="time-range-selector__options" role="group" aria-labelledby={`${groupId}-legend`}>
+      <div
+        className="time-range-selector__options"
+        role="group"
+        aria-labelledby={`${groupId}-legend`}
+      >
         {ALL_TIME_RANGES.map((range) => (
           <label key={range} className="time-range-option">
             <input

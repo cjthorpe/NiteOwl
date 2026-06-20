@@ -1,20 +1,17 @@
-import { and, eq } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import { and, eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
-import { requireAuth } from "../../plugins/auth.js";
-import { runLinearCatchup } from "../../lib/linear-catchup.js";
+import { requireAuth } from '../../plugins/auth.js';
+import { runLinearCatchup } from '../../lib/linear-catchup.js';
 
 // ---------------------------------------------------------------------------
 // Route plugin
 // ---------------------------------------------------------------------------
 
-export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
-  fastify,
-  { db },
-) => {
+export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
   /**
    * POST /api/integrations/linear/catchup
    *
@@ -23,10 +20,10 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
    * silently ignored via ON CONFLICT DO NOTHING.
    */
   fastify.post(
-    "/linear/catchup",
+    '/linear/catchup',
     {
       preHandler: requireAuth,
-      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (request, reply) => {
       const userId = request.user!.sub;
@@ -38,7 +35,7 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .where(
           and(
             eq(schema.integrations.userId, userId),
-            eq(schema.integrations.provider, "linear"),
+            eq(schema.integrations.provider, 'linear'),
             eq(schema.integrations.enabled, true),
           ),
         )
@@ -47,7 +44,7 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
       if (!integration) {
         return reply.code(404).send({
           success: false,
-          error: "No enabled Linear integration found",
+          error: 'No enabled Linear integration found',
         });
       }
 
@@ -56,17 +53,14 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
         .select({ accessTokenEncrypted: schema.oauthTokens.accessTokenEncrypted })
         .from(schema.oauthTokens)
         .where(
-          and(
-            eq(schema.oauthTokens.userId, userId),
-            eq(schema.oauthTokens.provider, "linear"),
-          ),
+          and(eq(schema.oauthTokens.userId, userId), eq(schema.oauthTokens.provider, 'linear')),
         )
         .limit(1);
 
       if (!tokenRow) {
         return reply.code(404).send({
           success: false,
-          error: "No Linear OAuth token found",
+          error: 'No Linear OAuth token found',
         });
       }
 
@@ -79,8 +73,8 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (
           accessToken: tokenRow.accessTokenEncrypted,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "fetch_failed";
-        request.log.error({ error: message }, "[linear-catchup] Failed to run catchup");
+        const message = err instanceof Error ? err.message : 'fetch_failed';
+        request.log.error({ error: message }, '[linear-catchup] Failed to run catchup');
         return reply.code(502).send({ success: false, error: message });
       }
 

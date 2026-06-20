@@ -3,8 +3,8 @@
  * server or Postgres connection is needed.  DB calls are intercepted via
  * vi.mock so every code-path in the route handlers is exercised.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildApp } from "../../app.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { buildApp } from '../../app.js';
 
 // ── DB mock ────────────────────────────────────────────────────────────────
 // Each test controls what the mock DB returns by reassigning these vars.
@@ -27,8 +27,8 @@ const mockDb = {
 };
 
 beforeEach(() => {
-  process.env["JWT_SECRET"] = "test-secret-at-least-32-chars-long!!";
-  process.env["COOKIE_SECRET"] = "test-cookie-secret-32-chars-long!!";
+  process.env['JWT_SECRET'] = 'test-secret-at-least-32-chars-long!!';
+  process.env['COOKIE_SECRET'] = 'test-cookie-secret-32-chars-long!!';
   selectRows = [];
   insertedRows = [];
   vi.clearAllMocks();
@@ -46,10 +46,10 @@ beforeEach(() => {
 });
 
 // ── Tests: POST /auth/register ─────────────────────────────────────────────
-describe("POST /auth/register", () => {
-  it("creates a user and returns an access token", async () => {
+describe('POST /auth/register', () => {
+  it('creates a user and returns an access token', async () => {
     selectRows = []; // no existing user
-    insertedRows = [{ id: "user-001", email: "alice@example.com" }];
+    insertedRows = [{ id: 'user-001', email: 'alice@example.com' }];
     // Second insert (refresh token) also needs to resolve
     mockDb.returning
       .mockImplementationOnce(() => Promise.resolve(insertedRows))
@@ -57,26 +57,26 @@ describe("POST /auth/register", () => {
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/register",
-      payload: { email: "alice@example.com", password: "hunter2hunter2" },
+      method: 'POST',
+      url: '/auth/register',
+      payload: { email: 'alice@example.com', password: 'hunter2hunter2' },
     });
 
     expect(res.statusCode).toBe(201);
     const body = res.json<{ success: boolean; data: { accessToken: string } }>();
     expect(body.success).toBe(true);
-    expect(typeof body.data.accessToken).toBe("string");
-    expect(body.data.accessToken.split(".")).toHaveLength(3);
+    expect(typeof body.data.accessToken).toBe('string');
+    expect(body.data.accessToken.split('.')).toHaveLength(3);
   });
 
-  it("returns 409 when the email is already registered", async () => {
-    selectRows = [{ id: "existing-user" }];
+  it('returns 409 when the email is already registered', async () => {
+    selectRows = [{ id: 'existing-user' }];
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/register",
-      payload: { email: "taken@example.com", password: "hunter2hunter2" },
+      method: 'POST',
+      url: '/auth/register',
+      payload: { email: 'taken@example.com', password: 'hunter2hunter2' },
     });
 
     expect(res.statusCode).toBe(409);
@@ -85,12 +85,12 @@ describe("POST /auth/register", () => {
     expect(body.error).toMatch(/already registered/i);
   });
 
-  it("returns 400 for invalid email format", async () => {
+  it('returns 400 for invalid email format', async () => {
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/register",
-      payload: { email: "not-an-email", password: "hunter2hunter2" },
+      method: 'POST',
+      url: '/auth/register',
+      payload: { email: 'not-an-email', password: 'hunter2hunter2' },
     });
 
     expect(res.statusCode).toBe(400);
@@ -98,32 +98,32 @@ describe("POST /auth/register", () => {
 });
 
 // ── Tests: POST /auth/login ────────────────────────────────────────────────
-describe("POST /auth/login", () => {
-  it("returns 401 for unknown email", async () => {
+describe('POST /auth/login', () => {
+  it('returns 401 for unknown email', async () => {
     selectRows = [];
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email: "ghost@example.com", password: "irrelevant" },
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'ghost@example.com', password: 'irrelevant' },
     });
 
     expect(res.statusCode).toBe(401);
   });
 
-  it("returns 401 for wrong password", async () => {
+  it('returns 401 for wrong password', async () => {
     // Pre-hash a known password so we can test mismatch
-    const { hashPassword } = await import("../../lib/password.js");
-    const hash = await hashPassword("correct-password");
-    selectRows = [{ id: "u1", email: "bob@example.com", passwordHash: hash }];
+    const { hashPassword } = await import('../../lib/password.js');
+    const hash = await hashPassword('correct-password');
+    selectRows = [{ id: 'u1', email: 'bob@example.com', passwordHash: hash }];
     mockDb.limit.mockImplementation(() => Promise.resolve(selectRows));
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email: "bob@example.com", password: "wrong-password" },
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'bob@example.com', password: 'wrong-password' },
     });
 
     expect(res.statusCode).toBe(401);
@@ -131,16 +131,16 @@ describe("POST /auth/login", () => {
 });
 
 // ── Tests: POST /auth/logout ───────────────────────────────────────────────
-describe("POST /auth/logout", () => {
-  it("clears the refresh cookie and returns success", async () => {
+describe('POST /auth/logout', () => {
+  it('clears the refresh cookie and returns success', async () => {
     mockDb.delete.mockReturnThis();
     mockDb.where.mockImplementation(() => Promise.resolve());
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/logout",
-      cookies: { niteowl_refresh: "some-fake-token" },
+      method: 'POST',
+      url: '/auth/logout',
+      cookies: { niteowl_refresh: 'some-fake-token' },
     });
 
     expect(res.statusCode).toBe(200);
@@ -148,30 +148,30 @@ describe("POST /auth/logout", () => {
     expect(body.success).toBe(true);
 
     // Cookie should be cleared
-    const setCookieHeader = res.headers["set-cookie"] as string | string[];
+    const setCookieHeader = res.headers['set-cookie'] as string | string[];
     const cookieStr = Array.isArray(setCookieHeader)
-      ? setCookieHeader.join("; ")
-      : (setCookieHeader ?? "");
+      ? setCookieHeader.join('; ')
+      : (setCookieHeader ?? '');
     expect(cookieStr).toMatch(/niteowl_refresh/);
   });
 });
 
 // ── Tests: POST /auth/refresh ──────────────────────────────────────────────
-describe("POST /auth/refresh", () => {
-  it("returns 401 with no cookie", async () => {
+describe('POST /auth/refresh', () => {
+  it('returns 401 with no cookie', async () => {
     const app = buildApp({ db: mockDb as never });
-    const res = await app.inject({ method: "POST", url: "/auth/refresh" });
+    const res = await app.inject({ method: 'POST', url: '/auth/refresh' });
     expect(res.statusCode).toBe(401);
   });
 
-  it("returns 401 for an unknown/never-issued refresh token", async () => {
+  it('returns 401 for an unknown/never-issued refresh token', async () => {
     selectRows = []; // no matching token in DB
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      cookies: { niteowl_refresh: "stale-token" },
+      method: 'POST',
+      url: '/auth/refresh',
+      cookies: { niteowl_refresh: 'stale-token' },
     });
 
     expect(res.statusCode).toBe(401);
@@ -181,23 +181,25 @@ describe("POST /auth/refresh", () => {
 });
 
 // ── Tests: POST /auth/refresh (happy path + rotation) ─────────────────────
-describe("POST /auth/refresh — token rotation", () => {
-  it("issues a new access token and rotates the refresh cookie on success", async () => {
+describe('POST /auth/refresh — token rotation', () => {
+  it('issues a new access token and rotates the refresh cookie on success', async () => {
     const futureExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     // 1st limit() call: find the stored token (active, not yet rotated).
     // 2nd limit() call: look up the user.
     mockDb.limit
       .mockImplementationOnce(() =>
-        Promise.resolve([{
-          id: "rt-001",
-          userId: "user-001",
-          rotatedAt: null,
-          expiresAt: futureExpiry,
-        }]),
+        Promise.resolve([
+          {
+            id: 'rt-001',
+            userId: 'user-001',
+            rotatedAt: null,
+            expiresAt: futureExpiry,
+          },
+        ]),
       )
       .mockImplementationOnce(() =>
-        Promise.resolve([{ id: "user-001", email: "alice@example.com" }]),
+        Promise.resolve([{ id: 'user-001', email: 'alice@example.com' }]),
       );
 
     // update().set().where() chain resolves via mockReturnThis → set returns Promise
@@ -205,22 +207,22 @@ describe("POST /auth/refresh — token rotation", () => {
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      cookies: { niteowl_refresh: "valid-refresh-jwt" },
+      method: 'POST',
+      url: '/auth/refresh',
+      cookies: { niteowl_refresh: 'valid-refresh-jwt' },
     });
 
     expect(res.statusCode).toBe(200);
     const body = res.json<{ success: boolean; data: { accessToken: string } }>();
     expect(body.success).toBe(true);
-    expect(typeof body.data.accessToken).toBe("string");
-    expect(body.data.accessToken.split(".")).toHaveLength(3);
+    expect(typeof body.data.accessToken).toBe('string');
+    expect(body.data.accessToken.split('.')).toHaveLength(3);
 
     // A new refresh cookie must be set (token rotation)
-    const setCookieHeader = res.headers["set-cookie"] as string | string[];
+    const setCookieHeader = res.headers['set-cookie'] as string | string[];
     const cookieStr = Array.isArray(setCookieHeader)
-      ? setCookieHeader.join("; ")
-      : (setCookieHeader ?? "");
+      ? setCookieHeader.join('; ')
+      : (setCookieHeader ?? '');
     expect(cookieStr).toMatch(/niteowl_refresh/);
 
     // The update (soft-mark rotatedAt) must have been called
@@ -229,23 +231,25 @@ describe("POST /auth/refresh — token rotation", () => {
     expect(mockDb.insert).toHaveBeenCalled();
   });
 
-  it("returns 401 for an expired token that was not yet rotated", async () => {
+  it('returns 401 for an expired token that was not yet rotated', async () => {
     const pastExpiry = new Date(Date.now() - 1000);
 
     mockDb.limit.mockImplementationOnce(() =>
-      Promise.resolve([{
-        id: "rt-expired",
-        userId: "user-001",
-        rotatedAt: null,
-        expiresAt: pastExpiry,
-      }]),
+      Promise.resolve([
+        {
+          id: 'rt-expired',
+          userId: 'user-001',
+          rotatedAt: null,
+          expiresAt: pastExpiry,
+        },
+      ]),
     );
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      cookies: { niteowl_refresh: "expired-token" },
+      method: 'POST',
+      url: '/auth/refresh',
+      cookies: { niteowl_refresh: 'expired-token' },
     });
 
     expect(res.statusCode).toBe(401);
@@ -257,25 +261,27 @@ describe("POST /auth/refresh — token rotation", () => {
 });
 
 // ── Tests: POST /auth/refresh — replay detection ───────────────────────────
-describe("POST /auth/refresh — replay detection (nuclear option)", () => {
-  it("revokes all user sessions when a previously-rotated token is replayed", async () => {
+describe('POST /auth/refresh — replay detection (nuclear option)', () => {
+  it('revokes all user sessions when a previously-rotated token is replayed', async () => {
     const futureExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     // The token exists in DB but has already been rotated (stolen scenario).
     mockDb.limit.mockImplementationOnce(() =>
-      Promise.resolve([{
-        id: "rt-already-used",
-        userId: "user-stolen",
-        rotatedAt: new Date(Date.now() - 60_000), // rotated 1 min ago
-        expiresAt: futureExpiry,
-      }]),
+      Promise.resolve([
+        {
+          id: 'rt-already-used',
+          userId: 'user-stolen',
+          rotatedAt: new Date(Date.now() - 60_000), // rotated 1 min ago
+          expiresAt: futureExpiry,
+        },
+      ]),
     );
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      cookies: { niteowl_refresh: "stolen-old-token" },
+      method: 'POST',
+      url: '/auth/refresh',
+      cookies: { niteowl_refresh: 'stolen-old-token' },
     });
 
     expect(res.statusCode).toBe(401);
@@ -290,32 +296,34 @@ describe("POST /auth/refresh — replay detection (nuclear option)", () => {
     expect(mockDb.insert).not.toHaveBeenCalled();
   });
 
-  it("clears the refresh cookie after replay detection", async () => {
+  it('clears the refresh cookie after replay detection', async () => {
     const futureExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     mockDb.limit.mockImplementationOnce(() =>
-      Promise.resolve([{
-        id: "rt-already-used",
-        userId: "user-stolen",
-        rotatedAt: new Date(),
-        expiresAt: futureExpiry,
-      }]),
+      Promise.resolve([
+        {
+          id: 'rt-already-used',
+          userId: 'user-stolen',
+          rotatedAt: new Date(),
+          expiresAt: futureExpiry,
+        },
+      ]),
     );
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      cookies: { niteowl_refresh: "stolen-old-token" },
+      method: 'POST',
+      url: '/auth/refresh',
+      cookies: { niteowl_refresh: 'stolen-old-token' },
     });
 
     expect(res.statusCode).toBe(401);
 
     // Cookie must be cleared so the attacker's browser loses the session
-    const setCookieHeader = res.headers["set-cookie"] as string | string[];
+    const setCookieHeader = res.headers['set-cookie'] as string | string[];
     const cookieStr = Array.isArray(setCookieHeader)
-      ? setCookieHeader.join("; ")
-      : (setCookieHeader ?? "");
+      ? setCookieHeader.join('; ')
+      : (setCookieHeader ?? '');
     expect(cookieStr).toMatch(/niteowl_refresh/);
   });
 });

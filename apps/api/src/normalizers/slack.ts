@@ -1,11 +1,11 @@
-import type { Activity } from "@niteowl/types";
+import type { Activity } from '@niteowl/types';
 
 // ---------------------------------------------------------------------------
 // Slack event payload types (minimal)
 // ---------------------------------------------------------------------------
 
 interface SlackEventCallback {
-  type: "event_callback";
+  type: 'event_callback';
   event: {
     type: string;
     channel?: string;
@@ -43,7 +43,7 @@ function tsToIso(ts: string): string {
 function buildSlackUrl(teamId: string, channel: string, ts: string): string {
   // Standard Slack deep-link format. Requires the team URL which isn't in the
   // payload, so we use the Slack archive format.
-  const anchor = ts.replace(".", "");
+  const anchor = ts.replace('.', '');
   return `https://slack.com/archives/${channel}/p${anchor}`;
 }
 
@@ -66,10 +66,10 @@ export function normalizeSlackEvent(
   userId: string,
 ): Activity | null {
   if (
-    typeof payload["type"] !== "string" ||
-    payload["type"] !== "event_callback" ||
-    payload["event"] == null ||
-    typeof payload["event"] !== "object"
+    typeof payload['type'] !== 'string' ||
+    payload['type'] !== 'event_callback' ||
+    payload['event'] == null ||
+    typeof payload['event'] !== 'object'
   ) {
     return null;
   }
@@ -78,20 +78,19 @@ export function normalizeSlackEvent(
   const { event } = typed;
 
   // Only handle plain messages (no bot messages, joins, etc.)
-  if (event.type !== "message") return null;
-  if (event.subtype != null && event.subtype !== "me_message") return null;
+  if (event.type !== 'message') return null;
+  if (event.subtype != null && event.subtype !== 'me_message') return null;
 
-  const channel = event.channel ?? "unknown";
-  const text = event.text ?? "";
+  const channel = event.channel ?? 'unknown';
+  const text = event.text ?? '';
   const truncated = text.length > 120 ? `${text.slice(0, 120)}…` : text;
-  const url =
-    event.permalink ?? buildSlackUrl(typed.team_id, channel, event.ts);
+  const url = event.permalink ?? buildSlackUrl(typed.team_id, channel, event.ts);
 
   return {
     id: crypto.randomUUID(),
     userId,
-    provider: "slack",
-    eventType: "issue_updated",
+    provider: 'slack',
+    eventType: 'issue_updated',
     sourceId: `message:${typed.event_id}`,
     title: `Slack message in #${channel}`,
     ...(truncated ? { description: truncated } : {}),

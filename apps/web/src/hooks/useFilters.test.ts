@@ -6,11 +6,7 @@ import { useFilters } from './useFilters';
 
 function wrapper({ initialSearch = '' }: { initialSearch?: string } = {}) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      MemoryRouter,
-      { initialEntries: [`/${initialSearch}`] },
-      children,
-    );
+    return React.createElement(MemoryRouter, { initialEntries: [`/${initialSearch}`] }, children);
   };
 }
 

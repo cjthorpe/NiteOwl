@@ -1,28 +1,22 @@
-import fp from "fastify-plugin";
-import type { FastifyPluginAsync } from "fastify";
-import { Queue } from "bullmq";
+import fp from 'fastify-plugin';
+import type { FastifyPluginAsync } from 'fastify';
+import { Queue } from 'bullmq';
 
-import type { Db } from "@niteowl/db";
-import type { NormalizationJobData, SlackAlertJobData } from "@niteowl/types";
-import {
-  NORMALIZATION_QUEUE,
-  createNormalizationWorker,
-} from "../workers/normalization.worker.js";
-import {
-  SLACK_ALERT_QUEUE,
-  createSlackAlertWorker,
-} from "../workers/slack-alert.worker.js";
+import type { Db } from '@niteowl/db';
+import type { NormalizationJobData, SlackAlertJobData } from '@niteowl/types';
+import { NORMALIZATION_QUEUE, createNormalizationWorker } from '../workers/normalization.worker.js';
+import { SLACK_ALERT_QUEUE, createSlackAlertWorker } from '../workers/slack-alert.worker.js';
 import {
   OVERNIGHT_CATCHUP_QUEUE,
   createOvernightCatchupWorker,
   type OvernightCatchupJobData,
-} from "../workers/overnight-catchup.worker.js";
+} from '../workers/overnight-catchup.worker.js';
 
 // ---------------------------------------------------------------------------
 // Fastify type augmentation
 // ---------------------------------------------------------------------------
 
-declare module "fastify" {
+declare module 'fastify' {
   interface FastifyInstance {
     normalizationQueue: Queue<NormalizationJobData> | null;
     slackAlertQueue: Queue<SlackAlertJobData> | null;
@@ -37,11 +31,11 @@ function parseRedisUrl(rawUrl: string): { host: string; port: number } {
   try {
     const url = new URL(rawUrl);
     return {
-      host: url.hostname || "localhost",
+      host: url.hostname || 'localhost',
       port: Number(url.port) || 6379,
     };
   } catch {
-    return { host: "localhost", port: 6379 };
+    return { host: 'localhost', port: 6379 };
   }
 }
 
@@ -52,7 +46,7 @@ function parseRedisUrl(rawUrl: string): { host: string; port: number } {
  * Values outside [0, 23] fall back to the default.
  */
 function parseCatchupHour(): number {
-  const raw = process.env["CATCHUP_HOUR_UTC"];
+  const raw = process.env['CATCHUP_HOUR_UTC'];
   if (!raw) return 6;
   const parsed = parseInt(raw, 10);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23 ? parsed : 6;
@@ -91,32 +85,25 @@ export interface QueuePluginOptions {
  * jobs. A null value indicates Redis was unavailable at startup — handlers must
  * treat this gracefully.
  */
-const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
-  fastify,
-  { db },
-) => {
-  const redisUrl =
-    process.env["REDIS_URL"] ?? "redis://localhost:6379";
+const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (fastify, { db }) => {
+  const redisUrl = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
   const redisOptions = parseRedisUrl(redisUrl);
 
   // ── Normalization queue ───────────────────────────────────────────────────
   const normalizationJobDefaults = {
     attempts: 5,
     backoff: {
-      type: "exponential" as const,
+      type: 'exponential' as const,
       delay: 1000,
     },
     removeOnComplete: { count: 1000 },
     removeOnFail: { count: 5000 },
   };
 
-  const normalizationQueue = new Queue<NormalizationJobData>(
-    NORMALIZATION_QUEUE,
-    {
-      connection: redisOptions,
-      defaultJobOptions: normalizationJobDefaults,
-    },
-  );
+  const normalizationQueue = new Queue<NormalizationJobData>(NORMALIZATION_QUEUE, {
+    connection: redisOptions,
+    defaultJobOptions: normalizationJobDefaults,
+  });
 
   // ── Slack-alert queue (FUL-34) ────────────────────────────────────────────
   // 3 retries with a fixed 60-second delay between each attempt so transient
@@ -124,7 +111,7 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
   const slackAlertJobDefaults = {
     attempts: 4, // 1 initial + 3 retries
     backoff: {
-      type: "fixed" as const,
+      type: 'fixed' as const,
       delay: 60_000, // 1 minute
     },
     removeOnComplete: { count: 500 },
@@ -139,18 +126,15 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
   // ── Overnight catch-up queue (FUL-60) ────────────────────────────────────
   // Retried up to 3 times with a 5-minute fixed delay so a transient network
   // hiccup at the scheduled hour doesn't skip the entire daily catch-up.
-  const overnightCatchupQueue = new Queue<OvernightCatchupJobData>(
-    OVERNIGHT_CATCHUP_QUEUE,
-    {
-      connection: redisOptions,
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: "fixed" as const, delay: 5 * 60_000 }, // 5 min
-        removeOnComplete: { count: 30 },
-        removeOnFail: { count: 90 },
-      },
+  const overnightCatchupQueue = new Queue<OvernightCatchupJobData>(OVERNIGHT_CATCHUP_QUEUE, {
+    connection: redisOptions,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'fixed' as const, delay: 5 * 60_000 }, // 5 min
+      removeOnComplete: { count: 30 },
+      removeOnFail: { count: 90 },
     },
-  );
+  });
 
   // Register (or update) the daily repeating scheduler.
   // upsertJobScheduler is idempotent: re-registering on every startup with the
@@ -166,30 +150,26 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
   // healthy startup (upsertJobScheduler is idempotent).
   void overnightCatchupQueue
     .upsertJobScheduler(
-      "overnight-catchup-daily",
+      'overnight-catchup-daily',
       { pattern: cronPattern },
-      { name: "run", data: {} },
+      { name: 'run', data: {} },
     )
     .then(() => {
       fastify.log.info(
         { cronPattern, catchupHour },
-        "[overnight-catchup] daily scheduler registered",
+        '[overnight-catchup] daily scheduler registered',
       );
     })
     .catch((err: unknown) => {
       fastify.log.error(
         { err, cronPattern },
-        "[overnight-catchup] scheduler registration failed — will retry on next healthy startup",
+        '[overnight-catchup] scheduler registration failed — will retry on next healthy startup',
       );
     });
 
   // ── Workers ───────────────────────────────────────────────────────────────
 
-  const normalizationWorker = createNormalizationWorker(
-    db,
-    redisOptions,
-    slackAlertQueue,
-  );
+  const normalizationWorker = createNormalizationWorker(db, redisOptions, slackAlertQueue);
 
   const slackAlertWorker = createSlackAlertWorker(db, redisOptions);
 
@@ -197,7 +177,7 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
 
   // ── Graceful shutdown ─────────────────────────────────────────────────────
 
-  fastify.addHook("onClose", async () => {
+  fastify.addHook('onClose', async () => {
     await overnightCatchupWorker.close().catch(() => undefined);
     await slackAlertWorker.close().catch(() => undefined);
     await normalizationWorker.close().catch(() => undefined);
@@ -208,11 +188,11 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (
 
   fastify.log.info(
     { host: redisOptions.host, port: redisOptions.port },
-    "BullMQ normalization + slack-alert + overnight-catchup queues registered",
+    'BullMQ normalization + slack-alert + overnight-catchup queues registered',
   );
 
-  fastify.decorate("normalizationQueue", normalizationQueue);
-  fastify.decorate("slackAlertQueue", slackAlertQueue);
+  fastify.decorate('normalizationQueue', normalizationQueue);
+  fastify.decorate('slackAlertQueue', slackAlertQueue);
 };
 
-export default fp(queuePlugin, { name: "queue", dependencies: [] });
+export default fp(queuePlugin, { name: 'queue', dependencies: [] });

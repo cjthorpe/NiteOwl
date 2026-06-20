@@ -1,8 +1,8 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
-import fp from "fastify-plugin";
-import { verifyToken, type TokenPayload } from "../lib/jwt.js";
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import fp from 'fastify-plugin';
+import { verifyToken, type TokenPayload } from '../lib/jwt.js';
 
-declare module "fastify" {
+declare module 'fastify' {
   interface FastifyRequest {
     user: TokenPayload | null;
   }
@@ -14,11 +14,11 @@ declare module "fastify" {
  * Use `requireAuth` helper to guard individual routes.
  */
 const authPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.decorateRequest("user", null);
+  fastify.decorateRequest('user', null);
 
-  fastify.addHook("onRequest", async (request) => {
+  fastify.addHook('onRequest', async (request) => {
     const header = request.headers.authorization;
-    if (!header?.startsWith("Bearer ")) return;
+    if (!header?.startsWith('Bearer ')) return;
     const token = header.slice(7);
     try {
       request.user = await verifyToken(token);
@@ -28,11 +28,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default fp(authPlugin, { name: "auth" });
+export default fp(authPlugin, { name: 'auth' });
 
 /** Prehandler that rejects requests without a verified JWT */
 export async function requireAuth(request: FastifyRequest): Promise<void> {
   if (!request.user) {
-    throw Object.assign(new Error("Unauthorized"), { statusCode: 401 });
+    throw Object.assign(new Error('Unauthorized'), { statusCode: 401 });
   }
 }

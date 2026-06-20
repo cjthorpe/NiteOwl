@@ -31,13 +31,23 @@ export function ProgressStepper({ steps, current }: ProgressStepperProps) {
                   : done
                     ? 'var(--color-success)'
                     : 'var(--color-text-subtle)',
-                border: active ? 'none' : done ? '1px solid var(--color-success)' : '1px solid var(--color-border)',
+                border: active
+                  ? 'none'
+                  : done
+                    ? '1px solid var(--color-success)'
+                    : '1px solid var(--color-border)',
               }}
               aria-current={active ? 'step' : undefined}
             >
               {done ? (
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M2 6l3 3 5-5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               ) : (
                 stepNum

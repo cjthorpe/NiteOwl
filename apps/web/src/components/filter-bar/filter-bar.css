@@ -211,7 +211,9 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-out-expo), color var(--duration-fast) var(--ease-out-expo);
+  transition:
+    background var(--duration-fast) var(--ease-out-expo),
+    color var(--duration-fast) var(--ease-out-expo);
   outline: none;
 }
 

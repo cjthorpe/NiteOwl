@@ -10,8 +10,7 @@ export function ErrorState({ onRetry }: ErrorStateProps) {
       </div>
       <p className="feed-state-title">Couldn't load your feed</p>
       <p className="feed-state-message">
-        Something went wrong fetching your activity. Check your connection and
-        try again.
+        Something went wrong fetching your activity. Check your connection and try again.
       </p>
       <button type="button" className="feed-retry-btn" onClick={onRetry}>
         Retry

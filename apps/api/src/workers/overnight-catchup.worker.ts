@@ -22,19 +22,19 @@
  *  - Per-integration results are logged at info level.
  */
 
-import { Worker } from "bullmq";
-import { and, eq } from "drizzle-orm";
+import { Worker } from 'bullmq';
+import { and, eq } from 'drizzle-orm';
 
-import type { Db } from "@niteowl/db";
-import { schema } from "@niteowl/db";
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 
-import { runLinearCatchup } from "../lib/linear-catchup.js";
+import { runLinearCatchup } from '../lib/linear-catchup.js';
 
 // ---------------------------------------------------------------------------
 // Queue name + job data type
 // ---------------------------------------------------------------------------
 
-export const OVERNIGHT_CATCHUP_QUEUE = "overnight-catchup";
+export const OVERNIGHT_CATCHUP_QUEUE = 'overnight-catchup';
 
 /**
  * No per-job input needed — the worker queries all active integrations from
@@ -62,7 +62,7 @@ export function createOvernightCatchupWorker(
   const worker = new Worker<OvernightCatchupJobData>(
     OVERNIGHT_CATCHUP_QUEUE,
     async (job) => {
-      const label = `[overnight-catchup] job ${job.id ?? "?"}`;
+      const label = `[overnight-catchup] job ${job.id ?? '?'}`;
       console.info(`${label} starting`);
 
       let totalIngested = 0;
@@ -85,14 +85,11 @@ export function createOvernightCatchupWorker(
           schema.oauthTokens,
           and(
             eq(schema.oauthTokens.userId, schema.integrations.userId),
-            eq(schema.oauthTokens.provider, "linear"),
+            eq(schema.oauthTokens.provider, 'linear'),
           ),
         )
         .where(
-          and(
-            eq(schema.integrations.provider, "linear"),
-            eq(schema.integrations.enabled, true),
-          ),
+          and(eq(schema.integrations.provider, 'linear'), eq(schema.integrations.enabled, true)),
         );
 
       for (const row of linearRows) {
@@ -180,15 +177,12 @@ export function createOvernightCatchupWorker(
     },
   );
 
-  worker.on("failed", (job, err) => {
-    console.error(
-      `[overnight-catchup] job ${job?.id ?? "unknown"} failed`,
-      { error: err.message },
-    );
+  worker.on('failed', (job, err) => {
+    console.error(`[overnight-catchup] job ${job?.id ?? 'unknown'} failed`, { error: err.message });
   });
 
-  worker.on("completed", (job) => {
-    console.info(`[overnight-catchup] job ${job.id ?? ""} completed`);
+  worker.on('completed', (job) => {
+    console.info(`[overnight-catchup] job ${job.id ?? ''} completed`);
   });
 
   return worker;
