@@ -5,7 +5,7 @@ ARG NODE_VERSION=22
 # ─── Base ──────────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.6.0 --activate
 
 # ─── Dependencies ──────────────────────────────────────────────────────────────
 FROM base AS deps
@@ -41,7 +41,7 @@ RUN pnpm --filter "@niteowl/shared" build && \
 # ─── Production ────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS production
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.6.0 --activate
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
