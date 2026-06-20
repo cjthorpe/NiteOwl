@@ -9,7 +9,7 @@ RUN corepack enable && corepack prepare pnpm@11.6.0 --activate
 
 # ─── Dependencies ──────────────────────────────────────────────────────────────
 FROM base AS deps
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc .pnpmfile.cjs ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
@@ -43,7 +43,7 @@ RUN pnpm --filter "@niteowl/shared" build && \
 FROM node:${NODE_VERSION}-alpine AS production
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.6.0 --activate
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc .pnpmfile.cjs ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
