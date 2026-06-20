@@ -24,6 +24,9 @@ COPY apps/api ./apps/api
 COPY packages/shared ./packages/shared
 COPY packages/types ./packages/types
 COPY packages/db ./packages/db
+RUN pnpm --filter "@niteowl/types" build && \
+    pnpm --filter "@niteowl/shared" build && \
+    pnpm --filter "@niteowl/db" build
 EXPOSE 3001
 CMD ["pnpm", "--filter", "@niteowl/api", "dev"]
 
