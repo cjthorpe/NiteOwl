@@ -35,6 +35,11 @@ export function buildApp(opts: BuildAppOptions = {}) {
   app.register(cors, {
     origin: process.env['CORS_ORIGIN'] ?? 'http://localhost:5173',
     credentials: true, // required for cross-origin cookie sending
+    // @fastify/cors v11 defaults `methods` to 'GET,HEAD,POST', which omits the
+    // verbs our API relies on. Without DELETE the browser preflight blocks the
+    // agent-login Remove button (FUL-79); PATCH routes are affected too. List
+    // every method we actually serve so cross-origin requests aren't rejected.
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   // ── Security: Cookie plugin ────────────────────────────────────────────────
