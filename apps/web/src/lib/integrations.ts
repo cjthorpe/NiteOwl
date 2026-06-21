@@ -50,7 +50,7 @@ export const PRIMARY_PROVIDER: ActivityProvider = 'github';
 export const OPTIONAL_PROVIDERS: ActivityProvider[] = ['linear', 'jira'];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
 export function buildOAuthStartUrl(provider: ActivityProvider): string {
   // The API auth route initiates OAuth server-side. The callback redirect_uri

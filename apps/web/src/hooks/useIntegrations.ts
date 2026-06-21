@@ -4,7 +4,7 @@ import type { ActivityProvider } from '@niteowl/types';
 import { getAuthHeaders } from '../lib/auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
 export interface ConnectedIntegration {
   provider: ActivityProvider;
