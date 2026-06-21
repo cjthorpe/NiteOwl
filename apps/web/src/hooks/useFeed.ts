@@ -17,7 +17,7 @@ export function useFeed(filters: FeedQueryFilters) {
         hours: filters.hours,
         providers: filters.providers,
         eventTypes: filters.eventTypes,
-        cursor: pageParam,
+        ...(pageParam !== undefined && { cursor: pageParam }),
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
