@@ -238,8 +238,7 @@ function enrichPayload(event: GitHubEvent): Record<string, unknown> {
         id: c['id'] ?? c['sha'],
         timestamp: c['timestamp'] ?? event.created_at,
         url:
-          c['url'] ??
-          `https://github.com/${event.repo.name}/commit/${String(c['sha'] ?? c['id'])}`,
+          c['url'] ?? `https://github.com/${event.repo.name}/commit/${String(c['sha'] ?? c['id'])}`,
       }));
     }
 
