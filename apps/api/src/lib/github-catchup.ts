@@ -223,9 +223,29 @@ function enrichPayload(event: GitHubEvent): Record<string, unknown> {
     },
   };
 
-  // For push events, ensure the `pusher` field is present
-  if (event.type === 'PushEvent' && !base['pusher']) {
-    base['pusher'] = { name: event.actor.login };
+  if (event.type === 'PushEvent') {
+    // Events API uses `head` for the post-push SHA; normalizer expects `after`
+    if (!base['after'] && base['head']) {
+      base['after'] = base['head'];
+    }
+
+    // Events API commit objects use `sha` (not `id`) and have no `timestamp`.
+    // Normalizer reads `commit.id`, `commit.timestamp`, and `commit.url`.
+    const rawCommits = base['commits'];
+    if (Array.isArray(rawCommits)) {
+      base['commits'] = rawCommits.map((c: Record<string, unknown>) => ({
+        ...c,
+        id: c['id'] ?? c['sha'],
+        timestamp: c['timestamp'] ?? event.created_at,
+        url:
+          c['url'] ??
+          `https://github.com/${event.repo.name}/commit/${String(c['sha'] ?? c['id'])}`,
+      }));
+    }
+
+    if (!base['pusher']) {
+      base['pusher'] = { name: event.actor.login };
+    }
   }
 
   return base;
