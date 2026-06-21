@@ -43,8 +43,15 @@ describe('App smoke tests', () => {
   });
 
   it('renders dashboard for authenticated users', async () => {
-    // Set the real token key so getAccessToken() returns a value immediately.
-    localStorage.setItem('niteowl:access_token', 'fake-token-for-test');
+    // useAuth now checks the JWT exp claim before treating a cached token as
+    // valid.  Use a properly-shaped token (header.payload.sig) with exp far in
+    // the future so isTokenExpiringSoon() returns false and the dashboard
+    // renders immediately without triggering a silent refresh.
+    const payload = btoa(
+      JSON.stringify({ sub: 'test-user', email: 'test@example.com', lastSeenAt: null, exp: 9999999999 }),
+    );
+    const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${payload}.fakesig`;
+    localStorage.setItem('niteowl:access_token', fakeJwt);
     renderApp('/dashboard');
     expect(await screen.findByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
   });
