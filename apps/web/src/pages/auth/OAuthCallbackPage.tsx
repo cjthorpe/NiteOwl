@@ -4,6 +4,7 @@ import type { ActivityProvider } from '@niteowl/types';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { ProviderLogo } from '../../components/ui/ProviderLogo';
 import { getIntegration } from '../../lib/integrations';
+import { refreshAccessToken } from '../../lib/auth';
 
 type CallbackStatus = 'loading' | 'success' | 'error';
 
@@ -48,21 +49,37 @@ export function OAuthCallbackPage() {
 
     if (status === 'success') {
       const eventCount = Number(eventCountParam) || 0;
-      connect(provider, eventCount);
-      setCallbackStatus('success');
 
-      // Auto-navigate after short delay so user sees success state
-      const timer = setTimeout(() => {
-        navigate('/onboarding', { replace: true });
-      }, 1800);
+      // Exchange the HttpOnly refresh cookie (set by the API callback) for a
+      // short-lived JWT access token.  This is required for all protected API
+      // calls; without it every request gets a 401.
+      refreshAccessToken().then((token) => {
+        if (!token) {
+          setErrorMessage('Session could not be established. Please try again.');
+          setCallbackStatus('error');
+          return;
+        }
 
-      return () => clearTimeout(timer);
+        connect(provider, eventCount);
+        setCallbackStatus('success');
+      });
+
+      return;
     }
 
     // No recognisable params — treat as error
     setErrorMessage('The connection could not be completed. Please try again.');
     setCallbackStatus('error');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-navigate after showing the success state briefly
+  useEffect(() => {
+    if (callbackStatus !== 'success') return;
+    const timer = setTimeout(() => {
+      navigate('/onboarding', { replace: true });
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, [callbackStatus, navigate]);
 
   const meta = isValidProvider(provider) ? getIntegration(provider) : undefined;
 

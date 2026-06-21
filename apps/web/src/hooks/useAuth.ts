@@ -1,8 +1,23 @@
-/**
- * Stub auth hook — will be wired to real session logic in a later issue.
- * Currently reads a flag from localStorage so ProtectedRoute can work in dev.
- */
-export function useAuth(): { isAuthenticated: boolean } {
-  const flag = typeof window !== 'undefined' ? localStorage.getItem('niteowl:auth') : null;
-  return { isAuthenticated: flag === 'true' };
+import { useState, useEffect } from 'react';
+import { getAccessToken, refreshAccessToken } from '../lib/auth';
+
+export function useAuth(): { isAuthenticated: boolean; isLoading: boolean } {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getAccessToken());
+  const [isLoading, setIsLoading] = useState(!getAccessToken());
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      setIsAuthenticated(true);
+      setIsLoading(false);
+      return;
+    }
+    // No token in memory — attempt a silent refresh via the HttpOnly cookie.
+    // This re-establishes the session after a page reload.
+    refreshAccessToken().then((token) => {
+      setIsAuthenticated(!!token);
+      setIsLoading(false);
+    });
+  }, []);
+
+  return { isAuthenticated, isLoading };
 }

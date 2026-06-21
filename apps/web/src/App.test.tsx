@@ -23,6 +23,7 @@ function renderApp(initialPath = '/login') {
 describe('App smoke tests', () => {
   beforeEach(() => {
     localStorage.removeItem('niteowl:auth');
+    localStorage.removeItem('niteowl:access_token');
   });
 
   it('renders the login page on /login', () => {
@@ -35,14 +36,16 @@ describe('App smoke tests', () => {
     expect(screen.getByText(/connect github to get started/i)).toBeInTheDocument();
   });
 
-  it('redirects unauthenticated users from /dashboard to /login', () => {
+  it('redirects unauthenticated users from /dashboard to /login', async () => {
     renderApp('/dashboard');
-    expect(screen.getByText(/sign in to your workspace/i)).toBeInTheDocument();
+    // ProtectedRoute attempts a silent token refresh before redirecting — wait for it.
+    expect(await screen.findByText(/sign in to your workspace/i)).toBeInTheDocument();
   });
 
-  it('renders dashboard for authenticated users', () => {
-    localStorage.setItem('niteowl:auth', 'true');
+  it('renders dashboard for authenticated users', async () => {
+    // Set the real token key so getAccessToken() returns a value immediately.
+    localStorage.setItem('niteowl:access_token', 'fake-token-for-test');
     renderApp('/dashboard');
-    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
   });
 });
