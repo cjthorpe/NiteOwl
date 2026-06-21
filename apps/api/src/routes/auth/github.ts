@@ -276,9 +276,11 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
         // Never put access tokens in URLs — they appear in browser history and
         // are readable by any JS on the page (violates OAuth 2.0 Security BCP).
         return reply.redirect(`${webRoot}/auth/callback?provider=github&status=success`, 302);
-      } catch {
+      } catch (err) {
+        // Log server-side so the real error is diagnosable from API logs.
         // Never expose raw error messages to the client — they may contain
         // internal details (DB connection strings, stack traces, etc.)
+        fastify.log.error({ err }, 'GitHub OAuth callback error');
         return reply.redirect(`${webRoot}/login?error=server_error`, 302);
       }
     },

@@ -8,6 +8,48 @@
       "when": 1781290589768,
       "tag": "0000_tiny_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781300000000,
+      "tag": "0001_slack_alert_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781400000000,
+      "tag": "0002_refresh_token_replay_detection",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781500000000,
+      "tag": "0003_slack_bot_user_logins",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781600000000,
+      "tag": "0004_activity_events_author_login",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781700000000,
+      "tag": "0005_user_agent_logins",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781800000000,
+      "tag": "0006_user_last_seen_at",
+      "breakpoints": true
     }
   ]
 }
