@@ -119,8 +119,12 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify
   );
 
   // ── Linear-specific routes (catchup) ─────────────────────────────────────
-  fastify.register(linearCatchupRoutes, opts);
+  // Pass only `{ db }`, never the parent `opts`: `opts` still carries the
+  // parent's `prefix` ('/api/integrations'), and Fastify applies a `prefix`
+  // option additively. Re-passing it would mount these routes at
+  // '/api/integrations/api/integrations/...' and 404 the documented paths (FUL-75).
+  fastify.register(linearCatchupRoutes, { db });
 
   // ── GitHub-specific routes (catchup) ─────────────────────────────────────
-  fastify.register(githubCatchupRoutes, opts);
+  fastify.register(githubCatchupRoutes, { db });
 };
