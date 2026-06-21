@@ -147,3 +147,88 @@ describe('GitHub catchup — rate limit handling', () => {
     expect(result.fetched).toBeGreaterThan(0);
   });
 });
+
+describe('GitHub catchup — enrichPayload (Events API shape)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('inserts a PushEvent whose commits use Events API shape (sha, no timestamp, no url)', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+
+    // Events API PushEvent: commits have `sha` not `id`, no `timestamp`, no `url`.
+    // The event-level field for post-push SHA is `head`, not `after`.
+    const eventsApiPushEvent = {
+      id: 'evt-events-api',
+      type: 'PushEvent',
+      actor: { id: 42, login: 'alice' },
+      repo: { id: 7, name: 'alice/project' },
+      payload: {
+        ref: 'refs/heads/main',
+        head: 'cafebabe', // Events API uses `head`, not `after`
+        before: '00000000',
+        commits: [
+          {
+            sha: 'cafebabe', // Events API uses `sha`, not `id`
+            message: 'fix: correct enrichPayload mapping',
+            // no `timestamp` field — must be derived from event.created_at
+            // no `url` field — must be synthesised
+          },
+        ],
+      },
+      created_at: recent,
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [eventsApiPushEvent],
+    } as unknown as Response);
+
+    // Second start URL returns nothing
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [],
+    } as unknown as Response);
+
+    const insertedRows: unknown[] = [];
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockImplementation((row: unknown) => {
+        insertedRows.push(row);
+        return db;
+      }),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'inserted-id' }]),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'alice',
+      accessToken: 'ghp_test3',
+      lookbackHours: 24,
+    });
+
+    // Should insert the push event, not skip it due to Invalid Date
+    expect(result.inserted).toBe(1);
+    expect(result.skipped).toBe(0);
+
+    // The inserted row should have a valid occurredAt (not Invalid Date)
+    const row = insertedRows[0] as { occurredAt: Date };
+    expect(row.occurredAt).toBeInstanceOf(Date);
+    expect(isNaN(row.occurredAt.getTime())).toBe(false);
+  });
+});
