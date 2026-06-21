@@ -34,10 +34,10 @@ export TOKEN=$(curl -s -X POST "$BASE/auth/login" \
 
 ## Health (public)
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | none | Liveness/health status |
-| GET | `/api/health` | none | Same payload, API-prefixed |
+| Method | Path          | Auth | Description                |
+| ------ | ------------- | ---- | -------------------------- |
+| GET    | `/health`     | none | Liveness/health status     |
+| GET    | `/api/health` | none | Same payload, API-prefixed |
 
 ```bash
 curl "$BASE/health"
@@ -48,16 +48,16 @@ curl "$BASE/api/health"
 
 ## Auth — prefix `/auth`
 
-| Method | Path | Auth | Body / Notes |
-|--------|------|------|--------------|
-| POST | `/auth/register` | none | `{ email, password, displayName? }` (password 8–72 chars) |
-| POST | `/auth/login` | none | `{ email, password }` |
-| POST | `/auth/refresh` | refresh cookie | Rotates access token from `refresh_token` cookie |
-| POST | `/auth/logout` | refresh cookie | Revokes the refresh token |
-| GET | `/auth/github` | none | Browser redirect to GitHub OAuth |
-| GET | `/auth/github/callback` | none | OAuth callback (GitHub redirects here) |
-| GET | `/auth/linear` | Bearer or refresh cookie | Browser redirect to Linear OAuth |
-| GET | `/auth/linear/callback` | none | OAuth callback (Linear redirects here) |
+| Method | Path                    | Auth                     | Body / Notes                                              |
+| ------ | ----------------------- | ------------------------ | --------------------------------------------------------- |
+| POST   | `/auth/register`        | none                     | `{ email, password, displayName? }` (password 8–72 chars) |
+| POST   | `/auth/login`           | none                     | `{ email, password }`                                     |
+| POST   | `/auth/refresh`         | refresh cookie           | Rotates access token from `refresh_token` cookie          |
+| POST   | `/auth/logout`          | refresh cookie           | Revokes the refresh token                                 |
+| GET    | `/auth/github`          | none                     | Browser redirect to GitHub OAuth                          |
+| GET    | `/auth/github/callback` | none                     | OAuth callback (GitHub redirects here)                    |
+| GET    | `/auth/linear`          | Bearer or refresh cookie | Browser redirect to Linear OAuth                          |
+| GET    | `/auth/linear/callback` | none                     | OAuth callback (Linear redirects here)                    |
 
 ```bash
 # Register
@@ -83,9 +83,9 @@ curl -i -H "Authorization: Bearer $TOKEN" "$BASE/auth/linear"
 
 ## Feed — prefix `/api/feed`
 
-| Method | Path | Auth | Query params |
-|--------|------|------|--------------|
-| GET | `/api/feed` | Bearer | `hours`, `since` (`last_login`), `provider`, `eventType`, `repo`, `author`, `cursor` |
+| Method | Path        | Auth   | Query params                                                                         |
+| ------ | ----------- | ------ | ------------------------------------------------------------------------------------ |
+| GET    | `/api/feed` | Bearer | `hours`, `since` (`last_login`), `provider`, `eventType`, `repo`, `author`, `cursor` |
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$BASE/api/feed?hours=24"
@@ -96,14 +96,14 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/api/feed?since=last_login&provider
 
 ## Integrations — prefix `/api/integrations`
 
-| Method | Path | Auth | Body / Notes |
-|--------|------|------|--------------|
-| GET | `/api/integrations` | Bearer | List the user's integrations |
-| PATCH | `/api/integrations/:id` | Bearer | `{ enabled: boolean }` |
-| DELETE | `/api/integrations/providers/:provider` | Bearer | `provider` ∈ `github\|linear\|jira\|slack`; clears tokens |
-| POST | `/api/integrations/linear/catchup` | Bearer | Backfill last 24h of Linear issues |
-| POST | `/api/integrations/github/sync` | Bearer | Fire-and-forget GitHub catch-up (202) |
-| POST | `/api/integrations/github/:installationId/catch-up` | Bearer | `{ since: ISO, until: ISO }` |
+| Method | Path                                                | Auth   | Body / Notes                                              |
+| ------ | --------------------------------------------------- | ------ | --------------------------------------------------------- |
+| GET    | `/api/integrations`                                 | Bearer | List the user's integrations                              |
+| PATCH  | `/api/integrations/:id`                             | Bearer | `{ enabled: boolean }`                                    |
+| DELETE | `/api/integrations/providers/:provider`             | Bearer | `provider` ∈ `github\|linear\|jira\|slack`; clears tokens |
+| POST   | `/api/integrations/linear/catchup`                  | Bearer | Backfill last 24h of Linear issues                        |
+| POST   | `/api/integrations/github/sync`                     | Bearer | Fire-and-forget GitHub catch-up (202)                     |
+| POST   | `/api/integrations/github/:installationId/catch-up` | Bearer | `{ since: ISO, until: ISO }`                              |
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$BASE/api/integrations"
@@ -127,11 +127,11 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/jso
 
 ## Webhooks — prefix `/api/webhooks` (provider-signed, no JWT)
 
-| Method | Path | Auth | Notes |
-|--------|------|------|-------|
-| POST | `/api/webhooks/github` | HMAC `x-hub-signature-256` | GitHub events |
-| POST | `/api/webhooks/linear` | Linear signature | Linear events |
-| POST | `/api/webhooks/jira?token=...` | shared `token` query | Jira events |
+| Method | Path                           | Auth                       | Notes         |
+| ------ | ------------------------------ | -------------------------- | ------------- |
+| POST   | `/api/webhooks/github`         | HMAC `x-hub-signature-256` | GitHub events |
+| POST   | `/api/webhooks/linear`         | Linear signature           | Linear events |
+| POST   | `/api/webhooks/jira?token=...` | shared `token` query       | Jira events   |
 
 ```bash
 # These require valid provider signatures; an unsigned call is rejected.
@@ -149,13 +149,13 @@ curl -X POST "$BASE/api/webhooks/jira?token=<shared-token>" \
 
 ## Slack alerts — prefix `/api/slack-alerts`
 
-| Method | Path | Auth | Body / Notes |
-|--------|------|------|--------------|
-| GET | `/api/slack-alerts` | Bearer | List configs |
-| POST | `/api/slack-alerts` | Bearer | `{ webhookUrl, watchedRepos?, botUserLogins? }` |
-| PATCH | `/api/slack-alerts/:id` | Bearer | `{ webhookUrl?, watchedRepos?, botUserLogins?, enabled? }` |
-| DELETE | `/api/slack-alerts/:id` | Bearer | Returns 204 |
-| POST | `/api/slack-alerts/:id/test` | Bearer | Sends a test message |
+| Method | Path                         | Auth   | Body / Notes                                               |
+| ------ | ---------------------------- | ------ | ---------------------------------------------------------- |
+| GET    | `/api/slack-alerts`          | Bearer | List configs                                               |
+| POST   | `/api/slack-alerts`          | Bearer | `{ webhookUrl, watchedRepos?, botUserLogins? }`            |
+| PATCH  | `/api/slack-alerts/:id`      | Bearer | `{ webhookUrl?, watchedRepos?, botUserLogins?, enabled? }` |
+| DELETE | `/api/slack-alerts/:id`      | Bearer | Returns 204                                                |
+| POST   | `/api/slack-alerts/:id/test` | Bearer | Sends a test message                                       |
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$BASE/api/slack-alerts"
@@ -176,11 +176,11 @@ curl -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/slack-alerts/<id>/test
 
 ## Agent logins — prefix `/api/agent-logins`
 
-| Method | Path | Auth | Body / Notes |
-|--------|------|------|--------------|
-| GET | `/api/agent-logins` | Bearer | List registered agent logins |
-| POST | `/api/agent-logins` | Bearer | `{ integration, login }` |
-| DELETE | `/api/agent-logins/:id` | Bearer | Remove an agent login |
+| Method | Path                    | Auth   | Body / Notes                 |
+| ------ | ----------------------- | ------ | ---------------------------- |
+| GET    | `/api/agent-logins`     | Bearer | List registered agent logins |
+| POST   | `/api/agent-logins`     | Bearer | `{ integration, login }`     |
+| DELETE | `/api/agent-logins/:id` | Bearer | Remove an agent login        |
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$BASE/api/agent-logins"
@@ -195,9 +195,9 @@ curl -X DELETE -H "Authorization: Bearer $TOKEN" "$BASE/api/agent-logins/<id>"
 
 ## Users — prefix `/api/users`
 
-| Method | Path | Auth | Notes |
-|--------|------|------|-------|
-| GET | `/api/users/me` | Bearer | Current user (derived from JWT, no DB hit) |
+| Method | Path            | Auth   | Notes                                      |
+| ------ | --------------- | ------ | ------------------------------------------ |
+| GET    | `/api/users/me` | Bearer | Current user (derived from JWT, no DB hit) |
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$BASE/api/users/me"
