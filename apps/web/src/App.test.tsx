@@ -48,7 +48,12 @@ describe('App smoke tests', () => {
     // the future so isTokenExpiringSoon() returns false and the dashboard
     // renders immediately without triggering a silent refresh.
     const payload = btoa(
-      JSON.stringify({ sub: 'test-user', email: 'test@example.com', lastSeenAt: null, exp: 9999999999 }),
+      JSON.stringify({
+        sub: 'test-user',
+        email: 'test@example.com',
+        lastSeenAt: null,
+        exp: 9999999999,
+      }),
     );
     const fakeJwt = `eyJhbGciOiJIUzI1NiJ9.${payload}.fakesig`;
     localStorage.setItem('niteowl:access_token', fakeJwt);
