@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
 import type { Db } from '@niteowl/db';
@@ -130,7 +130,8 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
       }
 
       const provider = request.query.provider?.toLowerCase();
-      const eventType = request.query.eventType?.toLowerCase();
+      // eventType accepts a single value or a comma-separated list of DB event types.
+      const eventTypeRaw = request.query.eventType?.toLowerCase();
       const repo = request.query.repo?.toLowerCase();
       const author = request.query.author?.trim() || undefined;
       const cursorRaw = request.query.cursor;
@@ -144,7 +145,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         userId,
         hours,
         provider,
-        eventType,
+        eventTypeRaw,
         repo,
         author,
         sinceKey ?? cursorRaw,
@@ -182,8 +183,20 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         'issue_updated',
         'comment_created',
       ] as const;
-      if (eventType && validEventTypes.includes(eventType as (typeof validEventTypes)[number])) {
-        conditions.push(eq(schema.activityEvents.eventType, eventType));
+      // Accept a single value or a comma-separated list (e.g. "pr_opened,pr_merged,pr_closed").
+      // Only known event types are allowed through; unknown values are silently dropped.
+      if (eventTypeRaw) {
+        const requestedTypes = eventTypeRaw
+          .split(',')
+          .map((t) => t.trim())
+          .filter((t): t is (typeof validEventTypes)[number] =>
+            validEventTypes.includes(t as (typeof validEventTypes)[number]),
+          );
+        if (requestedTypes.length === 1) {
+          conditions.push(eq(schema.activityEvents.eventType, requestedTypes[0]!));
+        } else if (requestedTypes.length > 1) {
+          conditions.push(inArray(schema.activityEvents.eventType, requestedTypes));
+        }
       }
 
       if (author) {

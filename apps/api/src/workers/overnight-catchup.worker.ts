@@ -114,59 +114,68 @@ export function createOvernightCatchupWorker(
         }
       }
 
-      // ── GitHub integrations — activated when FUL-61 lands ──────────────────
+      // ── GitHub integrations ─────────────────────────────────────────────────
       //
-      // runGitHubCatchup requires the user's GitHub login name, which is not
-      // currently stored in the integration configJson during OAuth.
-      //
-      // FUL-61 will persist configJson: { githubLogin } during the GitHub OAuth
-      // callback.  Once that lands, un-comment the block below:
-      //
-      // const githubRows = await db
-      //   .select({
-      //     integrationId: schema.integrations.id,
-      //     userId: schema.integrations.userId,
-      //     configJson: schema.integrations.configJson,
-      //     accessToken: schema.oauthTokens.accessTokenEncrypted,
-      //   })
-      //   .from(schema.integrations)
-      //   .innerJoin(
-      //     schema.oauthTokens,
-      //     and(
-      //       eq(schema.oauthTokens.userId, schema.integrations.userId),
-      //       eq(schema.oauthTokens.provider, "github"),
-      //     ),
-      //   )
-      //   .where(
-      //     and(
-      //       eq(schema.integrations.provider, "github"),
-      //       eq(schema.integrations.enabled, true),
-      //     ),
-      //   );
-      //
-      // for (const row of githubRows) {
-      //   const config = row.configJson as { githubLogin?: string } | null;
-      //   const githubLogin = config?.githubLogin ?? null;
-      //   if (!githubLogin) {
-      //     console.warn(`${label} github integration=${row.integrationId} — no githubLogin in config, skipping (FUL-61)`);
-      //     continue;
-      //   }
-      //   try {
-      //     const { runGitHubCatchup } = await import("../lib/github-catchup.js");
-      //     const result = await runGitHubCatchup({
-      //       db, userId: row.userId, integrationId: row.integrationId,
-      //       githubLogin, accessToken: row.accessToken,
-      //     });
-      //     totalIngested += result.inserted;
-      //     console.info(`${label} github user=${row.userId} integration=${row.integrationId} inserted=${result.inserted}`);
-      //   } catch (err) {
-      //     totalErrors++;
-      //     console.error(`${label} github catchup failed integration=${row.integrationId}`, err);
-      //   }
-      // }
+      // githubLogin is now persisted in configJson during the OAuth callback,
+      // so the full catch-up can run here. Each integration fetches events via
+      // the GitHub Events API for the user's login and inserts any new activity.
+
+      const githubRows = await db
+        .select({
+          integrationId: schema.integrations.id,
+          userId: schema.integrations.userId,
+          configJson: schema.integrations.configJson,
+          accessToken: schema.oauthTokens.accessTokenEncrypted,
+        })
+        .from(schema.integrations)
+        .innerJoin(
+          schema.oauthTokens,
+          and(
+            eq(schema.oauthTokens.userId, schema.integrations.userId),
+            eq(schema.oauthTokens.provider, 'github'),
+          ),
+        )
+        .where(
+          and(
+            eq(schema.integrations.provider, 'github'),
+            eq(schema.integrations.enabled, true),
+          ),
+        );
+
+      for (const row of githubRows) {
+        const config = row.configJson as { githubLogin?: string } | null;
+        const githubLogin = config?.githubLogin ?? null;
+        if (!githubLogin) {
+          console.warn(
+            `${label} github integration=${row.integrationId} — no githubLogin in config, skipping`,
+          );
+          continue;
+        }
+        try {
+          const { runGitHubCatchup } = await import('../lib/github-catchup.js');
+          const result = await runGitHubCatchup({
+            db,
+            userId: row.userId,
+            integrationId: row.integrationId,
+            githubLogin,
+            accessToken: row.accessToken,
+          });
+          totalIngested += result.inserted;
+          console.info(
+            `${label} github user=${row.userId} integration=${row.integrationId} inserted=${result.inserted}`,
+          );
+        } catch (err) {
+          totalErrors++;
+          console.error(
+            `${label} github catchup failed integration=${row.integrationId}`,
+            err instanceof Error ? err.message : err,
+          );
+          // Continue with remaining integrations — do not abort the job.
+        }
+      }
 
       console.info(
-        `${label} complete — ingested=${totalIngested} errors=${totalErrors} linear_integrations=${linearRows.length}`,
+        `${label} complete — ingested=${totalIngested} errors=${totalErrors} linear_integrations=${linearRows.length} github_integrations=${githubRows.length}`,
       );
     },
     {

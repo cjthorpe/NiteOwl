@@ -2,6 +2,18 @@ import type { Activity, ActivityProvider } from '@niteowl/types';
 import type { EventType } from '../types/filters';
 import { getAuthHeaders } from './auth';
 
+/**
+ * Maps UI-level event category shorthand to the DB-level event type strings
+ * the feed API understands.
+ */
+const EVENT_TYPE_DB_MAP: Record<EventType, string[]> = {
+  prs: ['pr_opened', 'pr_merged', 'pr_closed'],
+  commits: ['commit_pushed'],
+  issues: ['issue_opened', 'issue_closed', 'issue_updated'],
+  reviews: [],
+  comments: ['comment_created'],
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -25,7 +37,10 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
     url.searchParams.set('provider', params.providers.join(','));
   }
   if (params.eventTypes.length > 0) {
-    url.searchParams.set('events', params.eventTypes.join(','));
+    const dbTypes = params.eventTypes.flatMap((t) => EVENT_TYPE_DB_MAP[t] ?? []);
+    if (dbTypes.length > 0) {
+      url.searchParams.set('eventType', dbTypes.join(','));
+    }
   }
   if (params.cursor) {
     url.searchParams.set('cursor', params.cursor);
