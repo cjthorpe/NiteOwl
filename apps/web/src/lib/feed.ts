@@ -9,12 +9,12 @@ export interface FeedParams {
   hours: number;
   providers: ActivityProvider[];
   eventTypes: EventType[];
-  page: number;
+  cursor?: string;
 }
 
 export interface FeedPage {
   items: Activity[];
-  nextPage: number | null;
+  nextCursor: string | null;
   total: number;
 }
 
@@ -27,7 +27,9 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
   if (params.eventTypes.length > 0) {
     url.searchParams.set('events', params.eventTypes.join(','));
   }
-  url.searchParams.set('page', String(params.page));
+  if (params.cursor) {
+    url.searchParams.set('cursor', params.cursor);
+  }
 
   const res = await fetch(url.toString(), {
     credentials: 'include',
@@ -38,13 +40,17 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
     throw new Error(`Feed request failed: ${res.status}`);
   }
 
-  const json = (await res.json()) as { success: boolean; data: FeedPage; error: string | null };
+  const json = (await res.json()) as {
+    activities: Activity[];
+    nextCursor: string | null;
+    total: number;
+  };
 
-  if (!json.success) {
-    throw new Error(json.error ?? 'Unknown error fetching feed');
-  }
-
-  return json.data;
+  return {
+    items: json.activities,
+    nextCursor: json.nextCursor,
+    total: json.total,
+  };
 }
 
 export interface BriefingFeedParams {
@@ -78,19 +84,15 @@ export async function fetchBriefingItems(params: BriefingFeedParams): Promise<Ac
     if (!res.ok) throw new Error(`Feed request failed: ${res.status}`);
 
     const json = (await res.json()) as {
-      success: boolean;
-      data: { items: Activity[]; nextPage: number | null; nextCursor?: string | null };
-      error: string | null;
+      activities: Activity[];
+      nextCursor: string | null;
+      total: number;
     };
 
-    if (!json.success) throw new Error(json.error ?? 'Unknown error fetching feed');
+    allItems.push(...json.activities);
 
-    allItems.push(...json.data.items);
-
-    // Support cursor-based or page-based pagination termination
-    cursor = json.data.nextCursor ?? undefined;
-    if (!cursor && !json.data.nextPage) break;
-    if (!cursor && json.data.nextPage) break; // page-based: stop at first page for briefing
+    cursor = json.nextCursor ?? undefined;
+    if (!cursor) break;
   } while (cursor);
 
   return allItems;
