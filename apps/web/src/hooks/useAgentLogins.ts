@@ -6,9 +6,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthHeaders } from '../lib/auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
 export type AgentIntegration = 'github' | 'linear' | 'jira';
 
@@ -31,11 +32,6 @@ export interface UseAgentLoginsReturn {
   githubLogins: string[];
 }
 
-function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('niteowl:access_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export function useAgentLogins(): UseAgentLoginsReturn {
   const [logins, setLogins] = useState<AgentLogin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +47,7 @@ export function useAgentLogins(): UseAgentLoginsReturn {
       try {
         const res = await fetch(`${API_URL}/api/agent-logins`, {
           credentials: 'include',
-          headers: authHeaders(),
+          headers: getAuthHeaders(),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { logins: AgentLogin[] };
@@ -76,7 +72,7 @@ export function useAgentLogins(): UseAgentLoginsReturn {
     const res = await fetch(`${API_URL}/api/agent-logins`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ integration, login }),
     });
 
@@ -98,7 +94,7 @@ export function useAgentLogins(): UseAgentLoginsReturn {
     const res = await fetch(`${API_URL}/api/agent-logins/${id}`, {
       method: 'DELETE',
       credentials: 'include',
-      headers: authHeaders(),
+      headers: getAuthHeaders(),
     });
 
     if (!res.ok && res.status !== 404) {
