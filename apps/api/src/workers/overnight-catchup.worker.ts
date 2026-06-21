@@ -136,10 +136,7 @@ export function createOvernightCatchupWorker(
           ),
         )
         .where(
-          and(
-            eq(schema.integrations.provider, 'github'),
-            eq(schema.integrations.enabled, true),
-          ),
+          and(eq(schema.integrations.provider, 'github'), eq(schema.integrations.enabled, true)),
         );
 
       for (const row of githubRows) {
