@@ -5,6 +5,7 @@ import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
 
 import { requireAuth } from '../../plugins/auth.js';
+import { runGitHubCatchup } from '../../lib/github-catchup.js';
 
 // ---------------------------------------------------------------------------
 // GitHub REST API types (minimal surface for catchup)
@@ -111,6 +112,93 @@ interface CatchUpBody {
 // ---------------------------------------------------------------------------
 
 export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
+  /**
+   * POST /api/integrations/github/sync
+   *
+   * Triggers an immediate 24-hour activity backfill for the authenticated
+   * user's GitHub integration using the Events API. Runs asynchronously so
+   * the response returns immediately; progress is visible in server logs and
+   * the integration's lastSyncedAt timestamp is updated on completion.
+   *
+   * Rate-limited to 3 requests per minute to avoid hammering the GitHub API.
+   */
+  fastify.post(
+    '/github/sync',
+    {
+      preHandler: requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      const userId = request.user!.sub;
+
+      const [row] = await db
+        .select({
+          integrationId: schema.integrations.id,
+          configJson: schema.integrations.configJson,
+          accessToken: schema.oauthTokens.accessTokenEncrypted,
+        })
+        .from(schema.integrations)
+        .innerJoin(
+          schema.oauthTokens,
+          and(
+            eq(schema.oauthTokens.userId, schema.integrations.userId),
+            eq(schema.oauthTokens.provider, 'github'),
+          ),
+        )
+        .where(
+          and(
+            eq(schema.integrations.userId, userId),
+            eq(schema.integrations.provider, 'github'),
+            eq(schema.integrations.enabled, true),
+          ),
+        )
+        .limit(1);
+
+      if (!row) {
+        return reply
+          .code(404)
+          .send({ success: false, error: 'No enabled GitHub integration found' });
+      }
+
+      const config = row.configJson as { githubLogin?: string } | null;
+      const githubLogin = config?.githubLogin ?? null;
+
+      if (!githubLogin) {
+        return reply.code(422).send({
+          success: false,
+          error: 'GitHub login not stored — please reconnect your GitHub account',
+        });
+      }
+
+      // Fire and forget — the response returns immediately
+      runGitHubCatchup({
+        db,
+        userId,
+        integrationId: row.integrationId,
+        githubLogin,
+        accessToken: row.accessToken,
+      })
+        .then((result) => {
+          request.log.info(
+            { userId, integrationId: row.integrationId, ...result },
+            '[github-sync] catchup complete',
+          );
+          return db
+            .update(schema.integrations)
+            .set({ lastSyncedAt: new Date() })
+            .where(eq(schema.integrations.id, row.integrationId));
+        })
+        .catch((err: unknown) => {
+          request.log.error(
+            { err, userId, integrationId: row.integrationId },
+            '[github-sync] catchup failed',
+          );
+        });
+
+      return reply.code(202).send({ success: true, message: 'Sync started' });
+    },
+  );
+
   /**
    * POST /api/integrations/github/:installationId/catch-up
    *
