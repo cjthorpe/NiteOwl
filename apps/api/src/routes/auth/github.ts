@@ -94,7 +94,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
 
       const params = new URLSearchParams({
         client_id: clientId,
-        scope: 'user:email',
+        scope: 'user:email,public_repo',
         state,
       });
 
@@ -208,12 +208,21 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           integrationId = existingIntegration.id;
           await db
             .update(schema.integrations)
-            .set({ enabled: true, connectedAt: new Date() })
+            .set({
+              enabled: true,
+              connectedAt: new Date(),
+              configJson: { githubLogin: ghUser.login },
+            })
             .where(eq(schema.integrations.id, integrationId));
         } else {
           const [created] = await db
             .insert(schema.integrations)
-            .values({ userId, provider: 'github', enabled: true })
+            .values({
+              userId,
+              provider: 'github',
+              enabled: true,
+              configJson: { githubLogin: ghUser.login },
+            })
             .returning({ id: schema.integrations.id });
           if (!created) throw new Error('Failed to create GitHub integration');
           integrationId = created.id;
