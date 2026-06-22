@@ -6,6 +6,7 @@ import { schema } from '@niteowl/db';
 
 import { requireAuth } from '../../plugins/auth.js';
 import { runGitHubCatchup } from '../../lib/github-catchup.js';
+import { isRepoAllowed } from '../../lib/repo-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // GitHub REST API types (minimal surface for catchup)
@@ -177,6 +178,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
         integrationId: row.integrationId,
         githubLogin,
         accessToken: row.accessToken,
+        config: row.configJson as { repoAllowlist?: unknown } | null,
       })
         .then((result) => {
           request.log.info(
@@ -243,7 +245,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
 
       // ── Lookup integration — verify the authed user owns it ──────────────────
       const [integration] = await db
-        .select({ id: schema.integrations.id })
+        .select({ id: schema.integrations.id, configJson: schema.integrations.configJson })
         .from(schema.integrations)
         .where(
           and(
@@ -295,9 +297,15 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
         return reply.code(502).send({ success: false, error: message });
       }
 
-      // Only scan repos that had activity at or after the window start.
+      // Only scan repos that had activity at or after the window start, and —
+      // when a per-integration allowlist is configured (FUL-82) — only repos on
+      // it. With no allowlist, behaviour is unchanged (all active repos scanned).
+      const config = integration.configJson as { repoAllowlist?: unknown } | null;
       const activeRepos = repos.filter(
-        (r) => r.pushed_at !== null && new Date(r.pushed_at) >= sinceDate,
+        (r) =>
+          r.pushed_at !== null &&
+          new Date(r.pushed_at) >= sinceDate &&
+          isRepoAllowed(config, r.full_name),
       );
 
       const rows: Array<typeof schema.activityEvents.$inferInsert> = [];

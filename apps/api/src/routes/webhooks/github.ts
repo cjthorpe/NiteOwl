@@ -7,6 +7,8 @@ import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
 import type { NormalizationJobData } from '@niteowl/types';
 
+import { isRepoAllowed } from '../../lib/repo-allowlist.js';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -62,7 +64,7 @@ export function verifyGitHubSignature(
 async function resolveIntegration(
   db: Db,
   githubUserId: number,
-): Promise<{ userId: string; integrationId: string } | null> {
+): Promise<{ userId: string; integrationId: string; configJson: unknown } | null> {
   const githubId = String(githubUserId);
 
   const [user] = await db
@@ -74,7 +76,7 @@ async function resolveIntegration(
   if (!user) return null;
 
   const [integration] = await db
-    .select({ id: schema.integrations.id })
+    .select({ id: schema.integrations.id, configJson: schema.integrations.configJson })
     .from(schema.integrations)
     .where(
       and(
@@ -87,7 +89,18 @@ async function resolveIntegration(
 
   if (!integration) return null;
 
-  return { userId: user.id, integrationId: integration.id };
+  return { userId: user.id, integrationId: integration.id, configJson: integration.configJson };
+}
+
+/**
+ * Extracts `repository.full_name` from a GitHub webhook payload, if present.
+ * Most repo-scoped events (push, pull_request, issues, …) include it; a few
+ * account-level events (e.g. `ping`) do not.
+ */
+export function extractRepoFullName(payload: Record<string, unknown>): string | undefined {
+  const repository = payload['repository'] as Record<string, unknown> | undefined;
+  const fullName = repository?.['full_name'];
+  return typeof fullName === 'string' ? fullName : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +234,21 @@ export const githubWebhookRoutes: FastifyPluginAsync<GitHubWebhookOptions> = asy
         }
 
         const { userId, integrationId } = resolved;
+
+        // ── 4b. Per-integration repo allowlist (FUL-82) ───────────────
+        // Drop before enqueue when the integration restricts ingestion to a
+        // set of repos and this event's repo is not on it. Events without a
+        // repository (e.g. `ping`) are left for the normalizer to handle.
+        const repoFullName = extractRepoFullName(payload);
+        const repoConfig = resolved.configJson as { repoAllowlist?: unknown } | null;
+        if (repoFullName !== undefined && !isRepoAllowed(repoConfig, repoFullName)) {
+          request.log.debug(
+            { repoFullName, integrationId },
+            'Repo not on integration allowlist — dropping webhook',
+          );
+          await markWebhookProcessed(db, webhookId, 'processed');
+          return reply.code(200).send({ ok: true, skipped: 'repo_not_allowed' });
+        }
 
         // ── 5. Enqueue to BullMQ for async processing ─────────────────
         if (queue) {

@@ -7,13 +7,16 @@ import { schema } from '@niteowl/db';
 import { requireAuth } from '../../plugins/auth.js';
 import { githubCatchupRoutes } from './github-catchup-route.js';
 import { linearCatchupRoutes } from './linear-catchup.js';
+import { parseRepoAllowlist } from '../../lib/repo-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface ToggleBody {
-  enabled: boolean;
+interface UpdateBody {
+  enabled?: boolean;
+  /** Optional per-integration repo allowlist (FUL-82). [] / omitted = allow all. */
+  repoAllowlist?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,43 +38,97 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify
         enabled: schema.integrations.enabled,
         connectedAt: schema.integrations.connectedAt,
         lastSyncedAt: schema.integrations.lastSyncedAt,
+        configJson: schema.integrations.configJson,
       })
       .from(schema.integrations)
       .where(eq(schema.integrations.userId, userId))
       .orderBy(schema.integrations.connectedAt)
       .limit(100);
 
-    return reply.code(200).send({ integrations: rows });
+    // Surface the repo allowlist as a clean string[] without leaking the rest
+    // of configJson (which may hold internal fields like githubLogin).
+    const integrations = rows.map(({ configJson, ...rest }) => ({
+      ...rest,
+      repoAllowlist: parseRepoAllowlist(configJson as { repoAllowlist?: unknown } | null),
+    }));
+
+    return reply.code(200).send({ integrations });
   });
 
-  // ── PATCH /api/integrations/:id — enable or disable an integration ─────────
+  // ── PATCH /api/integrations/:id — toggle enabled and/or set repo allowlist ──
 
   fastify.patch<{
     Params: { id: string };
-    Body: ToggleBody;
+    Body: UpdateBody;
   }>('/:id', { preHandler: requireAuth }, async (request, reply) => {
     const userId = request.user!.sub;
     const { id } = request.params;
-    const body = request.body;
+    const body = request.body ?? {};
 
-    if (typeof body?.enabled !== 'boolean') {
-      return reply.code(400).send({ error: 'body.enabled must be a boolean' });
+    const hasEnabled = typeof body.enabled === 'boolean';
+    const hasAllowlist = body.repoAllowlist !== undefined;
+
+    if (!hasEnabled && !hasAllowlist) {
+      return reply
+        .code(400)
+        .send({ error: 'body must include `enabled` (boolean) and/or `repoAllowlist` (string[])' });
+    }
+
+    // Validate allowlist shape before touching the DB: must be an array of
+    // strings if provided. Entries are normalised (trim/lower/dedupe) by
+    // parseRepoAllowlist so matching stays consistent across ingestion paths.
+    if (hasAllowlist) {
+      if (
+        !Array.isArray(body.repoAllowlist) ||
+        !body.repoAllowlist.every((e) => typeof e === 'string')
+      ) {
+        return reply.code(400).send({ error: 'body.repoAllowlist must be an array of strings' });
+      }
+    }
+
+    // Load the current row first so we can merge the allowlist into configJson
+    // without clobbering other keys (e.g. githubLogin), and 404 cleanly.
+    const [existing] = await db
+      .select({ configJson: schema.integrations.configJson })
+      .from(schema.integrations)
+      .where(and(eq(schema.integrations.id, id), eq(schema.integrations.userId, userId)))
+      .limit(1);
+
+    if (!existing) {
+      return reply.code(404).send({ error: 'Integration not found' });
+    }
+
+    const updates: Partial<typeof schema.integrations.$inferInsert> = {};
+    if (hasEnabled) updates.enabled = body.enabled;
+
+    let nextAllowlist: string[] | null = null;
+    if (hasAllowlist) {
+      nextAllowlist = parseRepoAllowlist({ repoAllowlist: body.repoAllowlist });
+      const currentConfig = (existing.configJson as Record<string, unknown> | null) ?? {};
+      updates.configJson = { ...currentConfig, repoAllowlist: nextAllowlist };
     }
 
     const [updated] = await db
       .update(schema.integrations)
-      .set({ enabled: body.enabled })
+      .set(updates)
       .where(and(eq(schema.integrations.id, id), eq(schema.integrations.userId, userId)))
       .returning({
         id: schema.integrations.id,
         enabled: schema.integrations.enabled,
+        configJson: schema.integrations.configJson,
       });
 
     if (!updated) {
       return reply.code(404).send({ error: 'Integration not found' });
     }
 
-    return reply.code(200).send({ integration: updated });
+    return reply.code(200).send({
+      integration: {
+        id: updated.id,
+        enabled: updated.enabled,
+        repoAllowlist: parseRepoAllowlist(updated.configJson as { repoAllowlist?: unknown } | null),
+      },
+    });
   });
 
   // ── DELETE /api/integrations/providers/:provider — disconnect an integration ─

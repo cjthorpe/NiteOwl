@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { verifyGitHubSignature } from './github.js';
+import { extractRepoFullName, verifyGitHubSignature } from './github.js';
+import { isRepoAllowed } from '../../lib/repo-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,5 +66,61 @@ describe('verifyGitHubSignature', () => {
     );
     const sig = sign(body);
     expect(verifyGitHubSignature(body, sig, SECRET)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractRepoFullName — webhook repo extraction (FUL-82)
+// ---------------------------------------------------------------------------
+
+describe('extractRepoFullName', () => {
+  it('extracts repository.full_name from a repo-scoped payload', () => {
+    expect(extractRepoFullName({ repository: { full_name: 'acme/app' } })).toBe('acme/app');
+  });
+
+  it('returns undefined when there is no repository (e.g. ping)', () => {
+    expect(extractRepoFullName({ zen: 'Keep it logically awesome.' })).toBeUndefined();
+  });
+
+  it('returns undefined when full_name is missing or non-string', () => {
+    expect(extractRepoFullName({ repository: {} })).toBeUndefined();
+    expect(extractRepoFullName({ repository: { full_name: 42 } })).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Webhook ingestion drop decision (FUL-82)
+//
+// The handler drops before enqueue when a repo-scoped event's repository is
+// not on the integration allowlist. This mirrors that decision: a payload is
+// ingested when it has no repository OR the repo is allowed.
+// ---------------------------------------------------------------------------
+
+describe('webhook allowlist drop decision', () => {
+  const ingests = (
+    config: { repoAllowlist?: unknown } | null,
+    payload: Record<string, unknown>,
+  ) => {
+    const repo = extractRepoFullName(payload);
+    return repo === undefined || isRepoAllowed(config, repo);
+  };
+
+  it('ingests every repo when no allowlist is set', () => {
+    expect(ingests(null, { repository: { full_name: 'paperclipai/paperclip' } })).toBe(true);
+  });
+
+  it('drops a repo-scoped event when its repo is not on the allowlist', () => {
+    const config = { repoAllowlist: ['acme/app'] };
+    expect(ingests(config, { repository: { full_name: 'paperclipai/paperclip' } })).toBe(false);
+  });
+
+  it('ingests a repo-scoped event when its repo is on the allowlist (case-insensitive)', () => {
+    const config = { repoAllowlist: ['acme/app'] };
+    expect(ingests(config, { repository: { full_name: 'ACME/App' } })).toBe(true);
+  });
+
+  it('leaves repo-less events (e.g. ping) for the normalizer even with an allowlist', () => {
+    const config = { repoAllowlist: ['acme/app'] };
+    expect(ingests(config, { zen: 'Anything you build will inevitably break.' })).toBe(true);
   });
 });

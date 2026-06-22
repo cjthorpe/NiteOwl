@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { fetchWithBackoff, fetchAllPages } from './github-catchup-route.js';
+import { isRepoAllowed } from '../../lib/repo-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // Mock global fetch so tests never hit the network
@@ -219,5 +220,48 @@ describe('deduplication — external_id scheme', () => {
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(0); // duplicate silently ignored
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Repo-scan catch-up — per-integration allowlist (FUL-82)
+//
+// The handler scopes which repos it scans via:
+//   activeRepos = repos.filter(r =>
+//     r.pushed_at !== null && new Date(r.pushed_at) >= sinceDate &&
+//     isRepoAllowed(config, r.full_name))
+// These tests exercise that predicate directly.
+// ---------------------------------------------------------------------------
+
+describe('repo-scan catch-up — allowlist scoping', () => {
+  const since = new Date('2026-06-21T00:00:00Z');
+  const repos = [
+    { full_name: 'acme/app', pushed_at: '2026-06-22T08:00:00Z' },
+    { full_name: 'acme/api', pushed_at: '2026-06-22T09:00:00Z' },
+    { full_name: 'paperclipai/paperclip', pushed_at: '2026-06-22T10:00:00Z' },
+    { full_name: 'acme/stale', pushed_at: '2026-01-01T00:00:00Z' }, // before window
+  ];
+
+  const activeRepos = (config: { repoAllowlist?: unknown } | null) =>
+    repos
+      .filter(
+        (r) =>
+          r.pushed_at !== null &&
+          new Date(r.pushed_at) >= since &&
+          isRepoAllowed(config, r.full_name),
+      )
+      .map((r) => r.full_name);
+
+  it('scans every recently-pushed repo when no allowlist is set', () => {
+    expect(activeRepos(null)).toEqual(['acme/app', 'acme/api', 'paperclipai/paperclip']);
+  });
+
+  it('scans only allowlisted repos when an allowlist is set', () => {
+    expect(activeRepos({ repoAllowlist: ['acme/app'] })).toEqual(['acme/app']);
+  });
+
+  it('supports org wildcards while still respecting the time window', () => {
+    // acme/* matches acme/app and acme/api, but acme/stale is outside the window.
+    expect(activeRepos({ repoAllowlist: ['acme/*'] })).toEqual(['acme/app', 'acme/api']);
   });
 });
