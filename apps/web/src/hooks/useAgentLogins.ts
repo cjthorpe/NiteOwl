@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { getAuthHeaders } from '../lib/auth';
+import { authedFetch } from '../lib/auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
@@ -45,10 +45,7 @@ export function useAgentLogins(): UseAgentLoginsReturn {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_URL}/api/agent-logins`, {
-          credentials: 'include',
-          headers: getAuthHeaders(),
-        });
+        const res = await authedFetch(`${API_URL}/api/agent-logins`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { logins: AgentLogin[] };
         if (!cancelled) setLogins(data.logins);
@@ -69,10 +66,9 @@ export function useAgentLogins(): UseAgentLoginsReturn {
 
   // ── Add login ─────────────────────────────────────────────────────────────
   const addLogin = useCallback(async (integration: AgentIntegration, login: string) => {
-    const res = await fetch(`${API_URL}/api/agent-logins`, {
+    const res = await authedFetch(`${API_URL}/api/agent-logins`, {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ integration, login }),
     });
 
@@ -91,10 +87,8 @@ export function useAgentLogins(): UseAgentLoginsReturn {
 
   // ── Remove login ──────────────────────────────────────────────────────────
   const removeLogin = useCallback(async (id: string) => {
-    const res = await fetch(`${API_URL}/api/agent-logins/${id}`, {
+    const res = await authedFetch(`${API_URL}/api/agent-logins/${id}`, {
       method: 'DELETE',
-      credentials: 'include',
-      headers: getAuthHeaders(),
     });
 
     if (!res.ok && res.status !== 404) {

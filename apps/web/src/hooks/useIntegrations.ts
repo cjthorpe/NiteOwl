@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ActivityProvider } from '@niteowl/types';
-import { getAuthHeaders } from '../lib/auth';
+import { authedFetch } from '../lib/auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
@@ -50,10 +50,8 @@ export const useIntegrations = create<IntegrationsState>()(
         });
 
         // Delete tokens from the database (AC: tokens must be cleared on disconnect)
-        fetch(`${API_URL}/api/integrations/providers/${provider}`, {
+        authedFetch(`${API_URL}/api/integrations/providers/${provider}`, {
           method: 'DELETE',
-          credentials: 'include',
-          headers: getAuthHeaders(),
         }).catch(() => {
           // Non-fatal: local state is already cleared. Log silently.
         });

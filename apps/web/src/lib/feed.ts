@@ -1,6 +1,6 @@
 import type { Activity, ActivityProvider } from '@niteowl/types';
 import type { EventType } from '../types/filters';
-import { getAuthHeaders } from './auth';
+import { authedFetch } from './auth';
 
 /**
  * Maps UI-level event category shorthand to the DB-level event type strings
@@ -46,10 +46,7 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
     url.searchParams.set('cursor', params.cursor);
   }
 
-  const res = await fetch(url.toString(), {
-    credentials: 'include',
-    headers: getAuthHeaders(),
-  });
+  const res = await authedFetch(url.toString());
 
   if (!res.ok) {
     throw new Error(`Feed request failed: ${res.status}`);
@@ -95,7 +92,7 @@ export async function fetchBriefingItems(params: BriefingFeedParams): Promise<Ac
       url.searchParams.set('cursor', cursor);
     }
 
-    const res = await fetch(url.toString(), { credentials: 'include', headers: getAuthHeaders() });
+    const res = await authedFetch(url.toString());
     if (!res.ok) throw new Error(`Feed request failed: ${res.status}`);
 
     const json = (await res.json()) as {

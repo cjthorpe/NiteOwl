@@ -52,3 +52,32 @@ export function signOut(): void {
     // Non-fatal
   });
 }
+
+/**
+ * Authenticated fetch with automatic 401 recovery.
+ *
+ * The 1-hour access token frequently outlives a browser tab (it expires while
+ * the SPA is open, or is stale after a long idle period). Data calls that fire
+ * with such a token get a 401, and without recovery the dashboard wedges into
+ * "Couldn't load your feed" even though a valid 7-day refresh cookie is sitting
+ * right there. This wrapper attempts one silent refresh on a 401 and retries
+ * the request with the freshly minted token, so the session self-heals. If the
+ * refresh also fails the original 401 is returned for the caller to surface,
+ * and the access token has been cleared so route guards send the user to login.
+ */
+export async function authedFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
+  const send = (auth: HeadersInit): Promise<Response> =>
+    fetch(input, {
+      ...init,
+      credentials: 'include',
+      headers: { ...(init.headers ?? {}), ...auth },
+    });
+
+  const res = await send(getAuthHeaders());
+  if (res.status !== 401) return res;
+
+  const refreshed = await refreshAccessToken();
+  if (!refreshed) return res;
+
+  return send({ Authorization: `Bearer ${refreshed}` });
+}
