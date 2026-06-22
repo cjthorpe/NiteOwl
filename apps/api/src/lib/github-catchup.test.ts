@@ -232,3 +232,131 @@ describe('GitHub catchup — enrichPayload (Events API shape)', () => {
     expect(isNaN(row.occurredAt.getTime())).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-integration repo allowlist (FUL-82)
+// ---------------------------------------------------------------------------
+
+describe('GitHub catchup — repo allowlist', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** Two pages: a PushEvent for `allowed/repo` and one for `blocked/repo`. */
+  function twoRepoPages(recent: string) {
+    const mkEvent = (id: string, repo: string) => ({
+      id,
+      type: 'PushEvent',
+      actor: { id: 1, login: 'dev' },
+      repo: { id: 1, name: repo },
+      payload: {
+        ref: 'refs/heads/main',
+        after: 'abc123',
+        before: '000000',
+        commits: [
+          {
+            id: 'abc123',
+            message: 'feat: x',
+            url: `https://github.com/${repo}/commit/abc123`,
+            timestamp: recent,
+          },
+        ],
+        repository: { full_name: repo, html_url: `https://github.com/${repo}` },
+        pusher: { name: 'dev' },
+      },
+      created_at: recent,
+    });
+
+    return {
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [
+        mkEvent('evt-allowed', 'allowed/repo'),
+        mkEvent('evt-blocked', 'blocked/repo'),
+      ],
+    } as unknown as Response;
+  }
+
+  it('skips events whose repo is not on the allowlist', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+    mockFetch.mockResolvedValueOnce(twoRepoPages(recent));
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [],
+    } as unknown as Response);
+
+    const insertedRows: Array<{ metadata?: { repo?: string } }> = [];
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockImplementation((row: { metadata?: { repo?: string } }) => {
+        insertedRows.push(row);
+        return db;
+      }),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'inserted-id' }]),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'dev',
+      accessToken: 'ghp_test',
+      lookbackHours: 24,
+      config: { repoAllowlist: ['allowed/repo'] },
+    });
+
+    // Only the allowed repo's event is inserted; the blocked one is skipped.
+    expect(result.inserted).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0]?.metadata?.repo).toBe('allowed/repo');
+  });
+
+  it('ingests all repos when no allowlist is configured (backward-compatible)', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+    mockFetch.mockResolvedValueOnce(twoRepoPages(recent));
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [],
+    } as unknown as Response);
+
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'inserted-id' }]),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'dev',
+      accessToken: 'ghp_test',
+      lookbackHours: 24,
+      // no config → allow all
+    });
+
+    expect(result.inserted).toBe(2);
+    expect(result.skipped).toBe(0);
+  });
+});

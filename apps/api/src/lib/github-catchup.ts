@@ -6,6 +6,7 @@
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
 import { normalizeGitHubEvent } from '../normalizers/github.js';
+import { isRepoAllowed, type RepoAllowlistConfig } from './repo-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // GitHub Events API types (minimal surface we care about)
@@ -103,6 +104,12 @@ export interface CatchupOptions {
   accessToken: string;
   /** How many hours to look back — default 24 */
   lookbackHours?: number;
+  /**
+   * Integration config carrying an optional `repoAllowlist` (FUL-82). When the
+   * allowlist is non-empty, events whose repo is not on it are skipped at
+   * ingestion. Unset / empty preserves account-wide aggregation.
+   */
+  config?: RepoAllowlistConfig | null;
 }
 
 export interface CatchupResult {
@@ -118,7 +125,15 @@ export interface CatchupResult {
  * Handles pagination and respects X-RateLimit-* headers.
  */
 export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupResult> {
-  const { db, userId, integrationId, githubLogin, accessToken, lookbackHours = 24 } = opts;
+  const {
+    db,
+    userId,
+    integrationId,
+    githubLogin,
+    accessToken,
+    lookbackHours = 24,
+    config = null,
+  } = opts;
 
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
 
@@ -153,6 +168,13 @@ export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupRes
       }
 
       for (const event of recent) {
+        // Per-integration repo allowlist (FUL-82): skip non-allowlisted repos.
+        // `event.repo.name` is the full `owner/repo` name from the Events API.
+        if (!isRepoAllowed(config, event.repo?.name)) {
+          totalSkipped++;
+          continue;
+        }
+
         const activity = normalizeGitHubEvent(enrichPayload(event), userId);
 
         if (activity === null) {

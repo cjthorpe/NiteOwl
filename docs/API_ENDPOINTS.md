@@ -98,8 +98,8 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/api/feed?since=last_login&provider
 
 | Method | Path                                                | Auth   | Body / Notes                                              |
 | ------ | --------------------------------------------------- | ------ | --------------------------------------------------------- |
-| GET    | `/api/integrations`                                 | Bearer | List the user's integrations                              |
-| PATCH  | `/api/integrations/:id`                             | Bearer | `{ enabled: boolean }`                                    |
+| GET    | `/api/integrations`                                 | Bearer | List the user's integrations (incl. `repoAllowlist`)      |
+| PATCH  | `/api/integrations/:id`                             | Bearer | `{ enabled?: boolean, repoAllowlist?: string[] }`         |
 | DELETE | `/api/integrations/providers/:provider`             | Bearer | `provider` ∈ `github\|linear\|jira\|slack`; clears tokens |
 | POST   | `/api/integrations/linear/catchup`                  | Bearer | Backfill last 24h of Linear issues                        |
 | POST   | `/api/integrations/github/sync`                     | Bearer | Fire-and-forget GitHub catch-up (202)                     |
@@ -110,6 +110,11 @@ curl -H "Authorization: Bearer $TOKEN" "$BASE/api/integrations"
 
 curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"enabled":false}' "$BASE/api/integrations/<integrationId>"
+
+# Restrict a GitHub integration to specific repos (empty array = allow all).
+# Matching is case-insensitive on owner/repo; "owner/*" allows a whole org.
+curl -X PATCH -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"repoAllowlist":["acme/app","acme/*"]}' "$BASE/api/integrations/<integrationId>"
 
 curl -X DELETE -H "Authorization: Bearer $TOKEN" \
   "$BASE/api/integrations/providers/github"
