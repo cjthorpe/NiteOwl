@@ -297,7 +297,11 @@ export function RepoAllowlistControl({ provider = 'github' }: RepoAllowlistContr
             }}
           />
         </div>
-        <button type="submit" disabled={!inputValue.trim()} style={secondaryButton(!inputValue.trim())}>
+        <button
+          type="submit"
+          disabled={!inputValue.trim()}
+          style={secondaryButton(!inputValue.trim())}
+        >
           Add
         </button>
       </form>
@@ -331,7 +335,10 @@ export function RepoAllowlistControl({ provider = 'github' }: RepoAllowlistContr
             Discard
           </button>
         )}
-        <span aria-live="polite" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+        <span
+          aria-live="polite"
+          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+        >
           {saveError ? (
             <span role="alert" style={{ color: 'var(--color-danger)' }}>
               {saveError}
@@ -357,8 +364,16 @@ export function RepoAllowlistControl({ provider = 'github' }: RepoAllowlistContr
 
 function ModePill({ isAllowAll, count }: { isAllowAll: boolean; count: number }) {
   const accent = isAllowAll
-    ? { fg: 'var(--color-text-muted)', bg: 'var(--color-surface-overlay)', bd: 'var(--color-border)' }
-    : { fg: 'var(--color-accent)', bg: 'oklch(68% 0.22 278 / 0.1)', bd: 'oklch(68% 0.22 278 / 0.25)' };
+    ? {
+        fg: 'var(--color-text-muted)',
+        bg: 'var(--color-surface-overlay)',
+        bd: 'var(--color-border)',
+      }
+    : {
+        fg: 'var(--color-accent)',
+        bg: 'oklch(68% 0.22 278 / 0.1)',
+        bd: 'oklch(68% 0.22 278 / 0.25)',
+      };
   return (
     <span
       style={{

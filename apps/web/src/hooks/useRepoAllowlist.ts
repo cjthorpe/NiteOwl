@@ -11,7 +11,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ActivityProvider } from '@niteowl/types';
-import { fetchIntegrations, updateRepoAllowlist, type ApiIntegration } from '../lib/integrations-api';
+import {
+  fetchIntegrations,
+  updateRepoAllowlist,
+  type ApiIntegration,
+} from '../lib/integrations-api';
 
 export interface UseRepoAllowlistReturn {
   integration: ApiIntegration | null;
