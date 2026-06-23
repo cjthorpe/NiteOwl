@@ -1,4 +1,5 @@
 import { IntegrationCard } from '../components/integration-card/IntegrationCard';
+import { RepoAllowlistControl } from '../components/integration-card/RepoAllowlistControl';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { INTEGRATIONS } from '../lib/integrations';
 
@@ -59,7 +60,15 @@ export function Integrations() {
       {/* Integration cards */}
       <div className="flex flex-col gap-3">
         {INTEGRATIONS.map((meta) => (
-          <IntegrationCard key={meta.provider} meta={meta} />
+          <div key={meta.provider} className="flex flex-col gap-3">
+            <IntegrationCard meta={meta} />
+            {/* GitHub gets a repo-allowlist control directly beneath its card.
+                The control self-gates: it renders nothing until a persisted
+                GitHub integration exists (i.e. once connected). */}
+            {meta.provider === 'github' && isConnected('github') && (
+              <RepoAllowlistControl provider="github" />
+            )}
+          </div>
         ))}
       </div>
 
