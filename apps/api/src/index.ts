@@ -1,6 +1,6 @@
 import { runMigrations } from '@niteowl/db';
 import { buildApp } from './app.js';
-import { assertEmailConfigured } from './lib/email.js';
+import { missingEmailConfig } from './lib/email.js';
 
 const DATABASE_URL =
   process.env['DATABASE_URL'] ?? 'postgres://niteowl:niteowl_dev_password@localhost:5432/niteowl';
@@ -8,15 +8,21 @@ const PORT = Number(process.env['PORT'] ?? process.env['API_PORT'] ?? 3001);
 const HOST = process.env['HOST'] ?? process.env['API_HOST'] ?? '0.0.0.0';
 
 async function start() {
-  // Fail fast in production if email transport is unconfigured — the password
-  // reset flow depends on it. In dev/test the env vars are optional.
-  if (process.env['NODE_ENV'] === 'production') {
-    try {
-      assertEmailConfigured();
-    } catch (err) {
-      console.error('[startup] Email transport misconfigured — cannot start:', err);
+  // The password-reset flow depends on email transport. In production we fail
+  // fast so a broken deploy never accepts traffic. In dev/test the env vars are
+  // optional — but a misconfigured non-prod deployment would otherwise drop
+  // every reset email silently (the route logs and swallows the send failure to
+  // avoid leaking whether an account exists), which is exactly how such issues
+  // reach us as "reset email not received". So we always surface it at boot:
+  // hard-fail in production, loud warning everywhere else.
+  const missingEmail = missingEmailConfig();
+  if (missingEmail.length > 0) {
+    const detail = `email transport unconfigured — missing env: ${missingEmail.join(', ')}. Password reset emails will NOT be sent.`;
+    if (process.env['NODE_ENV'] === 'production') {
+      console.error(`[startup] ${detail} Cannot start.`);
       process.exit(1);
     }
+    console.warn(`[startup] WARNING: ${detail} Set RESEND_API_KEY and RESEND_FROM to enable delivery.`);
   }
 
   // Run all pending migrations before accepting traffic. Already-applied
