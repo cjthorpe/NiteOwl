@@ -50,6 +50,13 @@
       "when": 1781800000000,
       "tag": "0006_user_last_seen_at",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781900000000,
+      "tag": "0007_password_reset_tokens",
+      "breakpoints": true
     }
   ]
 }

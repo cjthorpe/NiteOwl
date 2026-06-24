@@ -234,6 +234,41 @@ export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
 
 // ---------------------------------------------------------------------------
+// password_reset_tokens
+// ---------------------------------------------------------------------------
+// Single-use, short-lived tokens backing the self-service "forgot password"
+// flow. The raw token is emailed to the user and never persisted — only its
+// SHA-256 fingerprint is stored, mirroring refresh_tokens.
+
+export const passwordResetTokens = pgTable(
+  'password_reset_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** SHA-256 hex digest of the raw opaque token emailed to the user */
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /**
+     * Set when the token is redeemed. Non-null means the token is spent and
+     * must be rejected — enforces single-use semantics.
+     */
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // token_hash is the sole lookup key — unique enforces the at-most-once
+    // invariant at the DB layer (and backs the lookup index).
+    unique('password_reset_tokens_token_hash_uniq').on(table.tokenHash),
+    index('password_reset_tokens_user_id_idx').on(table.userId),
+  ],
+);
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+// ---------------------------------------------------------------------------
 // user_agent_logins
 // ---------------------------------------------------------------------------
 // Per-user registry of AI agent identities per integration.
