@@ -202,6 +202,27 @@ Session refresh tokens. Stored as SHA-256 hashes — raw tokens are never persis
 - `refresh_tokens_user_id_idx` — `(user_id)`
 - `refresh_tokens_token_hash_idx` — `(token_hash)`
 
+### `password_reset_tokens`
+
+Single-use, short-lived tokens for the self-service "forgot password" flow.
+Stored as SHA-256 hashes — the raw token is emailed to the user and never
+persisted. A non-null `used_at` marks the token spent (single-use); validity is
+also bounded by `expires_at` (~30 min TTL, enforced in the application layer).
+
+| Column       | Type          | Notes                          |
+| ------------ | ------------- | ------------------------------ |
+| `id`         | `uuid`        | PK                             |
+| `user_id`    | `uuid`        | FK → `users.id` CASCADE DELETE |
+| `token_hash` | `text`        | SHA-256 hex of the raw token   |
+| `expires_at` | `timestamptz` | NOT NULL                       |
+| `used_at`    | `timestamptz` | Non-null once redeemed (spent) |
+| `created_at` | `timestamptz` | NOT NULL                       |
+
+**Indexes:**
+
+- `password_reset_tokens_token_hash_idx` — `(token_hash)`
+- `password_reset_tokens_user_id_idx` — `(user_id)`
+
 ## Encryption
 
 Sensitive fields (`access_token_encrypted`, `refresh_token_encrypted`, `webhook_url_encrypted`) use **AES-256-GCM** authenticated encryption implemented in `src/encryption.ts`.

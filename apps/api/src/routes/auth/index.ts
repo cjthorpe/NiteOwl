@@ -10,6 +10,7 @@ import { REFRESH_COOKIE } from './constants.js';
 import { emailAuthRoutes } from './email.js';
 import { githubAuthRoutes } from './github.js';
 import { linearAuthRoutes } from './linear.js';
+import { passwordResetRoutes } from './password-reset.js';
 
 export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) => {
   const { db } = opts;
@@ -22,6 +23,9 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
   // ── Linear OAuth ──────────────────────────────────────────────────────────
   fastify.register(linearAuthRoutes, { ...opts, prefix: '' });
+
+  // ── Password reset (forgot-password + reset-password) ─────────────────────
+  fastify.register(passwordResetRoutes, { ...opts, prefix: '' });
 
   // ── POST /auth/refresh ────────────────────────────────────────────────────
   fastify.post('/refresh', {
