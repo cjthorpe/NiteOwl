@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { DashboardLayout } from './components/layout/DashboardLayout';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AgentSettings } from './pages/AgentSettings';
 import { Dashboard } from './pages/Dashboard';
 import { Integrations } from './pages/Integrations';
@@ -13,6 +15,8 @@ export default function App() {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/auth/callback" element={<OAuthCallbackPage />} />
 

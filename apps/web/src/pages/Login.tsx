@@ -1,7 +1,17 @@
+import { Link, useLocation } from 'react-router-dom';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
 
+interface LoginLocationState {
+  /** Success notice handed over by the reset-password flow on completion. */
+  notice?: string;
+}
+
 export function Login() {
+  const location = useLocation();
+  const notice = (location.state as LoginLocationState | null)?.notice;
+
   function handleGitHubLogin() {
     window.location.href = `${API_URL}/auth/github`;
   }
@@ -49,6 +59,24 @@ export function Login() {
           </p>
         </header>
 
+        {notice && (
+          <p
+            role="status"
+            style={{
+              margin: 0,
+              padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: 'oklch(68% 0.18 145 / 0.12)',
+              border: '1px solid var(--color-success)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-text)',
+              fontSize: 'var(--text-sm)',
+              lineHeight: 1.5,
+            }}
+          >
+            {notice}
+          </p>
+        )}
+
         <div
           style={{
             backgroundColor: 'var(--color-surface-raised)',
@@ -83,6 +111,15 @@ export function Login() {
           >
             Continue with GitHub
           </button>
+
+          <p style={{ margin: 0, textAlign: 'center', fontSize: 'var(--text-sm)' }}>
+            <Link
+              to="/forgot-password"
+              style={{ color: 'var(--color-accent)', fontWeight: 600, textDecoration: 'none' }}
+            >
+              Forgot your password?
+            </Link>
+          </p>
         </div>
       </div>
     </main>
