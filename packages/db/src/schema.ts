@@ -258,7 +258,9 @@ export const passwordResetTokens = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('password_reset_tokens_token_hash_idx').on(table.tokenHash),
+    // token_hash is the sole lookup key — unique enforces the at-most-once
+    // invariant at the DB layer (and backs the lookup index).
+    unique('password_reset_tokens_token_hash_uniq').on(table.tokenHash),
     index('password_reset_tokens_user_id_idx').on(table.userId),
   ],
 );

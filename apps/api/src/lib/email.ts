@@ -131,22 +131,21 @@ export async function sendEmail(message: EmailMessage): Promise<SendEmailResult>
       }
 
       // 4xx — permanent (bad key, unverified sender, invalid recipient). Don't
-      // retry. Never include the response body verbatim in a thrown message
-      // that could surface upstream — keep it to status + provider text only.
+      // retry. Keep the thrown message to the status code only: the provider
+      // body can echo the recipient address, and this error is logged upstream
+      // by callers that deliberately avoid leaking whether an account exists.
       if (response.status >= 400 && response.status < 500) {
-        const body = await response.text().catch(() => '');
         throw new EmailError(
-          `Email provider returned ${response.status}: ${body}`,
+          `Email provider returned ${response.status}`,
           response.status,
           attempt,
           /* permanent */ true,
         );
       }
 
-      // 5xx — transient; fall through to retry.
-      const body = await response.text().catch(() => '');
+      // 5xx — transient; fall through to retry. Status only, no body (see above).
       lastError = new EmailError(
-        `Email provider returned ${response.status}: ${body}`,
+        `Email provider returned ${response.status}`,
         response.status,
         attempt,
         false,

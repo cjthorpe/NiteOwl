@@ -59,6 +59,12 @@ export const passwordResetRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
         const rawToken = generateOpaqueToken();
         const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
+        // Invalidate any outstanding tokens for this user so only the most
+        // recent reset link works, and to bound table growth under abuse.
+        await db
+          .delete(schema.passwordResetTokens)
+          .where(eq(schema.passwordResetTokens.userId, user.id));
+
         await db.insert(schema.passwordResetTokens).values({
           userId: user.id,
           tokenHash: sha256(rawToken),
@@ -89,7 +95,7 @@ export const passwordResetRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
   // token used, and revokes every refresh token for the user to force re-login
   // on all devices. All writes run in one transaction for atomicity.
   fastify.post<{ Body: ResetPasswordBody }>('/reset-password', {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -106,50 +112,55 @@ export const passwordResetRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
       const tokenHash = sha256(token);
       const now = new Date();
 
-      // Look up a still-valid token: matching hash, unexpired, unused.
-      const [stored] = await db
-        .select({
-          id: schema.passwordResetTokens.id,
-          userId: schema.passwordResetTokens.userId,
-        })
-        .from(schema.passwordResetTokens)
-        .where(
-          and(
-            eq(schema.passwordResetTokens.tokenHash, tokenHash),
-            isNull(schema.passwordResetTokens.usedAt),
-            gt(schema.passwordResetTokens.expiresAt, now),
-          ),
-        )
-        .limit(1);
-
-      if (!stored) {
-        return reply.code(400).send({ success: false, error: 'Invalid or expired reset token' });
-      }
-
-      const passwordHash = await hashPassword(password);
+      // The token lookup runs INSIDE the transaction with SELECT … FOR UPDATE
+      // so concurrent redemptions of the same token are serialised at the row
+      // level. Without this lock two simultaneous requests could both pass an
+      // out-of-transaction validity check and race to set different passwords.
+      let tokenValid = false;
 
       await db.transaction(async (tx) => {
+        const [stored] = await tx
+          .select({
+            id: schema.passwordResetTokens.id,
+            userId: schema.passwordResetTokens.userId,
+          })
+          .from(schema.passwordResetTokens)
+          .where(
+            and(
+              eq(schema.passwordResetTokens.tokenHash, tokenHash),
+              isNull(schema.passwordResetTokens.usedAt),
+              gt(schema.passwordResetTokens.expiresAt, now),
+            ),
+          )
+          .for('update')
+          .limit(1);
+
+        // Lost the race (already used/expired) or never existed → leave the
+        // transaction without writing; the handler returns a generic 400.
+        if (!stored) return;
+        tokenValid = true;
+
+        const passwordHash = await hashPassword(password);
+
         // Set the new password.
         await tx
           .update(schema.users)
           .set({ passwordHash, updatedAt: now })
           .where(eq(schema.users.id, stored.userId));
 
-        // Consume the token. The usedAt IS NULL guard makes a concurrent
-        // double-submit a no-op rather than a second reset.
+        // Consume the token (single-use). Safe under the row lock above.
         await tx
           .update(schema.passwordResetTokens)
           .set({ usedAt: now })
-          .where(
-            and(
-              eq(schema.passwordResetTokens.id, stored.id),
-              isNull(schema.passwordResetTokens.usedAt),
-            ),
-          );
+          .where(eq(schema.passwordResetTokens.id, stored.id));
 
         // Revoke every refresh token for the user — forces re-login everywhere.
         await tx.delete(schema.refreshTokens).where(eq(schema.refreshTokens.userId, stored.userId));
       });
+
+      if (!tokenValid) {
+        return reply.code(400).send({ success: false, error: 'Invalid or expired reset token' });
+      }
 
       return reply.send({
         success: true,

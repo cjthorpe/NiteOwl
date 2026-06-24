@@ -28,6 +28,8 @@ const mockDb = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
+  // .for('update') — row lock used by the reset-password lookup.
+  for: vi.fn().mockReturnThis(),
   limit: vi.fn().mockImplementation(() => Promise.resolve(selectRows)),
   insert: vi.fn().mockReturnThis(),
   values: vi.fn().mockReturnThis(),
@@ -52,6 +54,7 @@ beforeEach(() => {
   mockDb.update.mockReturnThis();
   mockDb.set.mockReturnThis();
   mockDb.delete.mockReturnThis();
+  mockDb.for.mockReturnThis();
   mockDb.transaction.mockImplementation((cb: (tx: typeof mockDb) => Promise<unknown>) =>
     cb(mockDb),
   );
@@ -89,6 +92,7 @@ describe('POST /auth/forgot-password', () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockDb.insert).toHaveBeenCalledTimes(1); // token row inserted
+    expect(mockDb.delete).toHaveBeenCalledTimes(1); // prior tokens invalidated first
     expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 
@@ -156,7 +160,10 @@ describe('POST /auth/reset-password', () => {
     const body = res.json<{ success: boolean; error: string }>();
     expect(body.success).toBe(false);
     expect(body.error).toMatch(/invalid or expired/i);
-    expect(mockDb.transaction).not.toHaveBeenCalled();
+    // Lookup happens inside the transaction (SELECT … FOR UPDATE) but no
+    // mutation runs when the token is missing.
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockDb.delete).not.toHaveBeenCalled();
   });
 
   it('resets the password, consumes the token, and revokes refresh tokens', async () => {

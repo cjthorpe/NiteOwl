@@ -12,5 +12,7 @@ CREATE TABLE "password_reset_tokens" (
   "created_at"  timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX "password_reset_tokens_token_hash_idx" ON "password_reset_tokens" ("token_hash");
+-- token_hash is the sole lookup key — UNIQUE enforces at-most-once and backs the lookup.
+ALTER TABLE "password_reset_tokens"
+  ADD CONSTRAINT "password_reset_tokens_token_hash_uniq" UNIQUE ("token_hash");
 CREATE INDEX "password_reset_tokens_user_id_idx" ON "password_reset_tokens" ("user_id");
