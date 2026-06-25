@@ -72,15 +72,27 @@ export function appBaseUrl(): string {
 }
 
 /**
+ * Return the names of any required email-transport env vars that are unset.
+ * Empty array means transport is fully configured. Used both to fail fast at
+ * startup and to emit a non-fatal warning in non-production environments — so a
+ * misconfigured deployment is visible at boot rather than discovered only after
+ * a user reports a missing reset email.
+ */
+export function missingEmailConfig(): string[] {
+  const missing: string[] = [];
+  if (!process.env['RESEND_API_KEY']) missing.push('RESEND_API_KEY');
+  if (!process.env['RESEND_FROM']) missing.push('RESEND_FROM');
+  return missing;
+}
+
+/**
  * Assert email transport is configured. Call once at startup in production so
  * the service fails fast instead of silently dropping reset emails. In
  * development/test the env vars are optional — sendEmail throws a clear error
  * only if it is actually invoked without configuration.
  */
 export function assertEmailConfigured(): void {
-  const missing: string[] = [];
-  if (!process.env['RESEND_API_KEY']) missing.push('RESEND_API_KEY');
-  if (!process.env['RESEND_FROM']) missing.push('RESEND_FROM');
+  const missing = missingEmailConfig();
   if (missing.length > 0) {
     throw new Error(`Email transport not configured — missing env: ${missing.join(', ')}`);
   }

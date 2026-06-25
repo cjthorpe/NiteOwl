@@ -5,6 +5,7 @@ import {
   assertEmailConfigured,
   buildPasswordResetEmail,
   EmailError,
+  missingEmailConfig,
   sendEmail,
 } from './email.js';
 
@@ -48,6 +49,27 @@ describe('appBaseUrl', () => {
 
   it('defaults to localhost when nothing is configured', () => {
     expect(appBaseUrl()).toBe('http://localhost:5173');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// missingEmailConfig
+// ---------------------------------------------------------------------------
+
+describe('missingEmailConfig', () => {
+  it('lists both vars when transport is entirely unconfigured', () => {
+    expect(missingEmailConfig()).toEqual(['RESEND_API_KEY', 'RESEND_FROM']);
+  });
+
+  it('lists only the var that is still missing', () => {
+    process.env['RESEND_API_KEY'] = 're_test_key';
+    expect(missingEmailConfig()).toEqual(['RESEND_FROM']);
+  });
+
+  it('returns an empty array once transport is fully configured', () => {
+    process.env['RESEND_API_KEY'] = 're_test_key';
+    process.env['RESEND_FROM'] = 'NiteOwl <no-reply@niteowl.dev>';
+    expect(missingEmailConfig()).toEqual([]);
   });
 });
 
