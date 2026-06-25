@@ -22,7 +22,9 @@ async function start() {
       console.error(`[startup] ${detail} Cannot start.`);
       process.exit(1);
     }
-    console.warn(`[startup] WARNING: ${detail} Set RESEND_API_KEY and RESEND_FROM to enable delivery.`);
+    console.warn(
+      `[startup] WARNING: ${detail} Set RESEND_API_KEY and RESEND_FROM to enable delivery.`,
+    );
   }
 
   // Run all pending migrations before accepting traffic. Already-applied
