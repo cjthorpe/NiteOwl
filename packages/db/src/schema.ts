@@ -303,3 +303,46 @@ export const userAgentLogins = pgTable(
 
 export type UserAgentLogin = typeof userAgentLogins.$inferSelect;
 export type NewUserAgentLogin = typeof userAgentLogins.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// personal_access_tokens
+// ---------------------------------------------------------------------------
+// Opaque, DB-backed Personal Access Tokens (PATs) — let OAuth-only users (who
+// have no password) mint a revocable Bearer token for headless/CLI/curl use.
+// The raw token is shown exactly once at creation and never persisted; only its
+// SHA-256 fingerprint is stored, mirroring refresh_tokens / password_reset_tokens.
+// The raw token carries a `niteowl_pat_` prefix so the auth plugin can cheaply
+// distinguish a PAT from a JWT before any DB lookup or signature verification.
+
+export const personalAccessTokens = pgTable(
+  'personal_access_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Human-readable label chosen at creation, e.g. "laptop CLI" */
+    name: text('name').notNull(),
+    /** SHA-256 hex digest of the raw opaque token — the sole lookup key */
+    tokenHash: text('token_hash').notNull(),
+    /** Space-separated scopes — nullable, reserved for future fine-grained perms */
+    scopes: text('scopes'),
+    /** Throttled bump on each successful auth — last time the token was used */
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    /** Null means the token never expires */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** Set when revoked via DELETE — non-null means the token must be rejected */
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // token_hash is the sole lookup key on every authenticated request — UNIQUE
+    // enforces at-most-once and backs the lookup index.
+    unique('personal_access_tokens_token_hash_uniq').on(table.tokenHash),
+    // Fast listing of all tokens for a user (management endpoints).
+    index('personal_access_tokens_user_id_idx').on(table.userId),
+  ],
+);
+
+export type PersonalAccessToken = typeof personalAccessTokens.$inferSelect;
+export type NewPersonalAccessToken = typeof personalAccessTokens.$inferInsert;
