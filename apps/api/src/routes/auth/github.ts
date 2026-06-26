@@ -6,11 +6,27 @@ import { schema } from '@niteowl/db';
 
 import { generateOAuthState, sha256, timingSafeCompare } from '../../lib/crypto.js';
 import { signRefreshToken } from '../../lib/jwt.js';
-import { runGitHubCatchup } from '../../lib/github-catchup.js';
+import { runGitHubRepoScan } from '../../lib/github-repo-scan.js';
 
 import { REFRESH_COOKIE } from './constants.js';
 
 const STATE_COOKIE = 'niteowl_oauth_state';
+
+/**
+ * OAuth scopes requested at authorize time. Single source of truth so the
+ * scopes we persist on the token row can never drift from what GitHub actually
+ * granted (FUL-99: the row previously claimed `user:email` while the token
+ * carried `public_repo` too).
+ *
+ * NOTE: `public_repo` grants read of **public** repos only. Private-repo
+ * activity (`runGitHubRepoScan`'s `/user/repos` + `/repos/{owner}/{repo}/commits`
+ * calls) returns nothing under this scope. Tracking private repos requires the
+ * full `repo` scope plus a re-consent from every connected user — a privacy
+ * escalation gated on board approval, not a silent change (see FUL-99).
+ */
+const GITHUB_OAUTH_SCOPE = 'user:email,public_repo';
+
+const CATCHUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 interface GitHubUser {
   id: number;
@@ -94,7 +110,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
 
       const params = new URLSearchParams({
         client_id: clientId,
-        scope: 'user:email,public_repo',
+        scope: GITHUB_OAUTH_SCOPE,
         state,
       });
 
@@ -242,7 +258,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
             .update(schema.oauthTokens)
             .set({
               accessTokenEncrypted: ghToken,
-              scopes: 'user:email',
+              scopes: GITHUB_OAUTH_SCOPE,
               updatedAt: new Date(),
             })
             .where(eq(schema.oauthTokens.id, existingToken.id));
@@ -251,36 +267,50 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
             userId,
             provider: 'github',
             accessTokenEncrypted: ghToken,
-            scopes: 'user:email',
+            scopes: GITHUB_OAUTH_SCOPE,
           });
         }
 
-        // Trigger 24-hour activity catchup in background (non-blocking)
-        runGitHubCatchup({
+        // Trigger a 24-hour activity backfill in the background (non-blocking).
+        // FUL-99: this uses the deterministic repo-scan source
+        // (`/repos/{owner}/{repo}/commits` + `/pulls`) rather than the
+        // user-scoped Events API, mirroring POST /api/integrations/github/sync,
+        // so the one-shot post-connect backfill reflects real repo activity
+        // (every contributor) instead of only the connecting user's timeline.
+        const until = new Date();
+        const since = new Date(until.getTime() - CATCHUP_WINDOW_MS);
+
+        runGitHubRepoScan({
           db,
           userId,
           integrationId,
-          githubLogin: ghUser.login,
           accessToken: ghToken,
+          since,
+          until,
+          // The configJson written above carries no repoAllowlist, so this
+          // initial backfill scans all active repos (FUL-82 allow-all), matching
+          // the /github/sync default. Ongoing syncs re-read the persisted config.
+          config: null,
+          logger: fastify.log,
         })
           .then((result) => {
             fastify.log.info(
               {
                 userId,
                 integrationId,
-                fetched: result.fetched,
-                inserted: result.inserted,
-                skipped: result.skipped,
+                reposScanned: result.reposScanned,
+                ingested: result.ingested,
+                total: result.total,
                 errors: result.errors,
-                // Pull the Error message/stack out: pino only serializes Errors
-                // under the `err`/`error` keys, so a raw Error spread under
-                // `lastError` serializes to `{}` (the FUL-98 observability bug).
+                // Surface the actual per-repo failure. Pino only runs its Error
+                // serializer on the `err`/`error` keys, so a raw Error spread
+                // under any other key serialises to `{}` (the FUL-98 bug).
                 lastErrorMessage: result.lastError?.message,
                 lastErrorStack: result.lastError?.stack,
               },
-              'GitHub catchup complete (post-login)',
+              '[github-repo-scan] post-login backfill complete',
             );
-            // Update lastSyncedAt after catchup
+            // Update lastSyncedAt after the backfill.
             db.update(schema.integrations)
               .set({ lastSyncedAt: new Date() })
               .where(eq(schema.integrations.id, integrationId))
@@ -289,7 +319,10 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
               });
           })
           .catch((err: unknown) => {
-            fastify.log.error({ err, userId, integrationId }, 'GitHub catchup failed (post-login)');
+            fastify.log.error(
+              { err, userId, integrationId },
+              '[github-repo-scan] post-login backfill failed',
+            );
           });
 
         // Redirect to frontend; the frontend must call POST /auth/refresh to
