@@ -69,6 +69,26 @@ function IconAgents() {
   );
 }
 
+function IconKey() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="11" r="3" />
+      <path d="M7.1 8.9 14 2" />
+      <path d="M11 5l2 2M9 7l1.5 1.5" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg
@@ -92,6 +112,7 @@ const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: IconDashboard },
   { to: '/settings/integrations', label: 'Integrations', icon: IconIntegrations },
   { to: '/settings/agents', label: 'AI Agents', icon: IconAgents },
+  { to: '/settings/tokens', label: 'Access Tokens', icon: IconKey },
   { to: '/settings', label: 'Settings', icon: IconSettings },
 ];
 

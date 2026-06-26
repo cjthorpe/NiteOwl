@@ -5,6 +5,7 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AgentSettings } from './pages/AgentSettings';
+import { TokenSettings } from './pages/TokenSettings';
 import { Dashboard } from './pages/Dashboard';
 import { Integrations } from './pages/Integrations';
 import { Login } from './pages/Login';
@@ -29,6 +30,8 @@ export default function App() {
           <Route path="/settings/integrations" element={<Integrations />} />
           {/* Agent login registry */}
           <Route path="/settings/agents" element={<AgentSettings />} />
+          {/* Personal access tokens (FUL-93) */}
+          <Route path="/settings/tokens" element={<TokenSettings />} />
           <Route path="/settings" element={<Navigate to="/settings/integrations" replace />} />
         </Route>
       </Route>
