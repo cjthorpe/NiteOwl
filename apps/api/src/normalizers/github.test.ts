@@ -274,6 +274,50 @@ describe('normalizeGitHubEvent — issues', () => {
   });
 });
 
+// Regression (FUL-89): the Events API can yield items with a missing/null
+// `repository` (after `enrichPayload` could not synthesise one from a repo-less
+// event). The normalizer must fall back to a placeholder slug rather than
+// dereferencing `payload.repository.full_name` and throwing.
+describe('normalizeGitHubEvent — missing repository (FUL-89)', () => {
+  it('does not throw on a PR event with no repository', () => {
+    const { repository: _repo, ...prWithoutRepo } = prOpenedPayload;
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(prWithoutRepo, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('pr_opened');
+    expect(result?.title).toBe('[unknown/unknown] PR #42: Add dark mode support');
+    expect(result?.metadata).toMatchObject({ repo: 'unknown/unknown' });
+  });
+
+  it('does not throw on a push event with a null repository', () => {
+    const payload = { ...pushPayload, repository: null };
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(payload, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('commit_pushed');
+    expect(result?.metadata).toMatchObject({ repo: 'unknown/unknown' });
+    expect(result?.url).toBe('https://github.com/unknown/unknown/commit/bbbbbbb');
+  });
+
+  it('does not throw on an issue event with no repository', () => {
+    const { repository: _repo, ...issueWithoutRepo } = issueOpenedPayload;
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(issueWithoutRepo, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('issue_opened');
+    expect(result?.metadata).toMatchObject({ repo: 'unknown/unknown' });
+  });
+});
+
 describe('normalizeGitHubEvent — unknown payload shape', () => {
   it('returns null for a completely unknown payload', () => {
     expect(normalizeGitHubEvent({}, USER_ID)).toBeNull();
