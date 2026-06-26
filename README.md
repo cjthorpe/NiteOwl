@@ -1,6 +1,10 @@
 # NiteOwl
 
-Monorepo for the NiteOwl application — React/TypeScript frontend, Fastify API, Drizzle ORM, shared types.
+NiteOwl is a morning-briefing dashboard for engineering teams that run AI coding agents. 
+
+The core use case: a developer arrives after being offline overnight, opens NiteOwl, and immediately sees everything their AI agents (Claude Code, Copilot, Devin, Paperclip, etc.) and human teammates built, merged, and changed while they were away.
+
+The platform connects to a team's toolchain (GitHub, Linear, Jira, Slack), normalises inbound events into a unified time-ordered activity feed, and can push targeted Slack alerts when a watched repo gets an agent-driven PR merge. The feed defaults to a "since last login" window calibrated to an overnight gap. The botUserLogins filter on Slack alerts and the user_agent_logins registry are the clearest in-code evidence that "surface what the agents did overnight" is the product's organising principle.
 
 ## Stack
 
