@@ -46,6 +46,14 @@ describe('ForgotPasswordPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/something went wrong/i);
   });
 
+  it('shows the GitHub hint unconditionally, before any submission (no enumeration oracle)', () => {
+    renderPage();
+    // Visible to everyone on the default surface — never gated on account state.
+    expect(screen.getByText(/signed up with github\?/i)).toBeInTheDocument();
+    const githubLink = screen.getByRole('link', { name: /continue with github/i });
+    expect(githubLink).toHaveAttribute('href', '/login');
+  });
+
   it('links back to sign in', () => {
     renderPage();
     expect(screen.getByRole('link', { name: /back to sign in/i })).toHaveAttribute(
