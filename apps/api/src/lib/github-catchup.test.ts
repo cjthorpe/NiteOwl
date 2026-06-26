@@ -359,4 +359,80 @@ describe('GitHub catchup — repo allowlist', () => {
     expect(result.inserted).toBe(2);
     expect(result.skipped).toBe(0);
   });
+
+  // Regression (FUL-88): a single malformed event or transient insert failure
+  // must not abort the whole catchup run and silently drop every subsequent
+  // event. Previously an uncaught throw inside the loop killed the run.
+  it('isolates a per-event failure and continues with remaining events', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+
+    const makePushEvent = (id: string, sha: string) => ({
+      id,
+      type: 'PushEvent',
+      actor: { id: 1, login: 'dev' },
+      repo: { id: 1, name: 'acme/app' },
+      payload: {
+        ref: 'refs/heads/main',
+        after: sha,
+        before: '000000',
+        commits: [
+          {
+            id: sha,
+            message: 'feat: change',
+            url: `https://github.com/acme/app/commit/${sha}`,
+            timestamp: recent,
+          },
+        ],
+      },
+      created_at: recent,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [makePushEvent('evt-1', 'aaa111'), makePushEvent('evt-2', 'bbb222')],
+    } as unknown as Response);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [],
+    } as unknown as Response);
+
+    // First insert throws, second succeeds — the run must survive the first.
+    let call = 0;
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockImplementation(() => {
+        call += 1;
+        if (call === 1) return Promise.reject(new Error('boom'));
+        return Promise.resolve([{ id: 'inserted-id' }]);
+      }),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'dev',
+      accessToken: 'ghp_test',
+      lookbackHours: 24,
+    });
+
+    // The second event still gets inserted despite the first throwing.
+    expect(result.inserted).toBe(1);
+    expect(result.errors).toBe(1);
+    expect(result.lastError).toBeInstanceOf(Error);
+  });
 });
