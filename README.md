@@ -1,6 +1,6 @@
 # NiteOwl
 
-NiteOwl is a morning-briefing dashboard for engineering teams that run AI coding agents. 
+NiteOwl is a morning-briefing dashboard for engineering teams that run AI coding agents.
 
 The core use case: a developer arrives after being offline overnight, opens NiteOwl, and immediately sees everything their AI agents (Claude Code, Copilot, Devin, Paperclip, etc.) and human teammates built, merged, and changed while they were away.
 
