@@ -28,7 +28,19 @@ RUN pnpm --filter "@niteowl/types" build && \
     pnpm --filter "@niteowl/shared" build && \
     pnpm --filter "@niteowl/db" build
 EXPOSE 3001
-CMD ["pnpm", "--filter", "@niteowl/api", "dev"]
+# The API runs from source via tsx, but it imports the workspace packages
+# (@niteowl/db, /shared, /types) through their compiled `dist` (their package
+# `main`). `compose watch` syncs those packages' `src` into the container, so we
+# MUST keep their `dist` recompiling — otherwise a schema/source change leaves a
+# stale `dist` and lookups like `schema.personalAccessTokens` resolve to
+# `undefined` at runtime (FUL-96). Run each package's `tsc --watch` alongside the
+# API's `tsx watch` so synced source is always rebuilt before the API reloads.
+CMD ["pnpm", "--parallel", \
+     "--filter", "@niteowl/types", \
+     "--filter", "@niteowl/shared", \
+     "--filter", "@niteowl/db", \
+     "--filter", "@niteowl/api", \
+     "run", "dev"]
 
 # ─── Build ─────────────────────────────────────────────────────────────────────
 FROM deps AS builder
