@@ -116,9 +116,12 @@ export function createOvernightCatchupWorker(
 
       // ── GitHub integrations ─────────────────────────────────────────────────
       //
-      // githubLogin is now persisted in configJson during the OAuth callback,
-      // so the full catch-up can run here. Each integration fetches events via
-      // the GitHub Events API for the user's login and inserts any new activity.
+      // FUL-98: ingest via the deterministic repo-scan source
+      // (`/repos/{owner}/{repo}/commits` + `/pulls`) rather than the user-scoped
+      // Events API. The Events API only returns the connecting user's personal
+      // timeline, so commits/PRs by other contributors never landed on the board.
+      // Repo-scan needs only the access token (`/user/repos`), so no githubLogin
+      // is required. The per-integration allowlist (FUL-82) is respected.
 
       const githubRows = await db
         .select({
@@ -139,41 +142,39 @@ export function createOvernightCatchupWorker(
           and(eq(schema.integrations.provider, 'github'), eq(schema.integrations.enabled, true)),
         );
 
+      // Catch-up window: the last 24 h, matching the nightly cadence.
+      const until = new Date();
+      const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
+
       for (const row of githubRows) {
-        const config = row.configJson as { githubLogin?: string } | null;
-        const githubLogin = config?.githubLogin ?? null;
-        if (!githubLogin) {
-          console.warn(
-            `${label} github integration=${row.integrationId} — no githubLogin in config, skipping`,
-          );
-          continue;
-        }
         try {
-          const { runGitHubCatchup } = await import('../lib/github-catchup.js');
-          const result = await runGitHubCatchup({
+          const { runGitHubRepoScan } = await import('../lib/github-repo-scan.js');
+          const result = await runGitHubRepoScan({
             db,
             userId: row.userId,
             integrationId: row.integrationId,
-            githubLogin,
             accessToken: row.accessToken,
+            since,
+            until,
+            config: row.configJson as { repoAllowlist?: unknown } | null,
           });
-          totalIngested += result.inserted;
+          totalIngested += result.ingested;
           console.info(
-            `${label} github user=${row.userId} integration=${row.integrationId} inserted=${result.inserted} skipped=${result.skipped} errors=${result.errors}`,
+            `${label} github user=${row.userId} integration=${row.integrationId} reposScanned=${result.reposScanned} ingested=${result.ingested} total=${result.total} errors=${result.errors}`,
           );
-          // Surface per-event failures the catchup isolated & counted rather
-          // than letting them vanish: the whole point of FUL-90 is that a bad
-          // event is skipped-and-counted, not silently dropped.
+          // Surface per-repo failures the scan isolated & counted rather than
+          // letting them vanish: a bad repo is skipped-and-counted, not silently
+          // dropped.
           if (result.errors > 0) {
             console.error(
-              `${label} github catchup had ${result.errors} per-event error(s) integration=${row.integrationId}`,
+              `${label} github repo-scan had ${result.errors} per-repo error(s) integration=${row.integrationId}`,
               result.lastError?.message ?? 'unknown',
             );
           }
         } catch (err) {
           totalErrors++;
           console.error(
-            `${label} github catchup failed integration=${row.integrationId}`,
+            `${label} github repo-scan failed integration=${row.integrationId}`,
             err instanceof Error ? err.message : err,
           );
           // Continue with remaining integrations — do not abort the job.

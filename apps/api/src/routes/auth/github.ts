@@ -265,7 +265,19 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
         })
           .then((result) => {
             fastify.log.info(
-              { userId, integrationId, ...result },
+              {
+                userId,
+                integrationId,
+                fetched: result.fetched,
+                inserted: result.inserted,
+                skipped: result.skipped,
+                errors: result.errors,
+                // Pull the Error message/stack out: pino only serializes Errors
+                // under the `err`/`error` keys, so a raw Error spread under
+                // `lastError` serializes to `{}` (the FUL-98 observability bug).
+                lastErrorMessage: result.lastError?.message,
+                lastErrorStack: result.lastError?.stack,
+              },
               'GitHub catchup complete (post-login)',
             );
             // Update lastSyncedAt after catchup
