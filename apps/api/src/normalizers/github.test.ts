@@ -172,6 +172,39 @@ describe('normalizeGitHubEvent — pull_request', () => {
     );
     expect(result).toBeNull();
   });
+
+  // Regression (FUL-88): the GitHub Events API (catchup path) can return a
+  // pull_request with a missing/null `user` (ghost / deleted author) and no
+  // `base`/`sender`. This previously threw
+  // "Cannot read properties of undefined (reading 'login')" and aborted the
+  // whole catchup run.
+  it('does not throw when pull_request.user is undefined', () => {
+    const { user: _user, base: _base, ...prWithoutUser } = prOpenedPayload.pull_request;
+    const payload = { ...prOpenedPayload, pull_request: prWithoutUser, sender: undefined };
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(payload, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('pr_opened');
+    expect(result?.metadata).toMatchObject({ author: null, sender: null, baseBranch: null });
+  });
+
+  it('does not throw when pull_request.user is null', () => {
+    const payload = {
+      ...prMergedPayload,
+      pull_request: { ...prMergedPayload.pull_request, user: null },
+    };
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(payload, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('pr_merged');
+    expect(result?.metadata).toMatchObject({ author: null });
+  });
 });
 
 describe('normalizeGitHubEvent — push', () => {
@@ -190,6 +223,18 @@ describe('normalizeGitHubEvent — push', () => {
   it('returns null for an empty commits array', () => {
     const result = normalizeGitHubEvent({ ...pushPayload, commits: [] }, USER_ID);
     expect(result).toBeNull();
+  });
+
+  it('does not throw when pusher is missing', () => {
+    const { pusher: _pusher, ...pushWithoutPusher } = pushPayload;
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(pushWithoutPusher, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('commit_pushed');
+    expect(result?.metadata).toMatchObject({ pusher: null });
   });
 });
 
@@ -213,6 +258,19 @@ describe('normalizeGitHubEvent — issues', () => {
   it('returns null for unrecognised issue actions', () => {
     const result = normalizeGitHubEvent({ ...issueOpenedPayload, action: 'milestoned' }, USER_ID);
     expect(result).toBeNull();
+  });
+
+  it('does not throw when issue.user is missing', () => {
+    const { user: _user, ...issueWithoutUser } = issueOpenedPayload.issue;
+    const payload = { ...issueOpenedPayload, issue: issueWithoutUser, sender: undefined };
+
+    let result;
+    expect(() => {
+      result = normalizeGitHubEvent(payload, USER_ID);
+    }).not.toThrow();
+
+    expect(result?.eventType).toBe('issue_opened');
+    expect(result?.metadata).toMatchObject({ author: null, sender: null });
   });
 });
 

@@ -159,8 +159,17 @@ export function createOvernightCatchupWorker(
           });
           totalIngested += result.inserted;
           console.info(
-            `${label} github user=${row.userId} integration=${row.integrationId} inserted=${result.inserted}`,
+            `${label} github user=${row.userId} integration=${row.integrationId} inserted=${result.inserted} skipped=${result.skipped} errors=${result.errors}`,
           );
+          // Surface per-event failures the catchup isolated & counted rather
+          // than letting them vanish: the whole point of FUL-90 is that a bad
+          // event is skipped-and-counted, not silently dropped.
+          if (result.errors > 0) {
+            console.error(
+              `${label} github catchup had ${result.errors} per-event error(s) integration=${row.integrationId}`,
+              result.lastError?.message ?? 'unknown',
+            );
+          }
         } catch (err) {
           totalErrors++;
           console.error(

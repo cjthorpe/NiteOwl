@@ -116,6 +116,10 @@ export interface CatchupResult {
   fetched: number;
   inserted: number;
   skipped: number;
+  /** Number of events that threw during normalization/insert and were skipped. */
+  errors: number;
+  /** The most recent per-event error, if any — for caller-side logging. */
+  lastError?: Error;
 }
 
 /**
@@ -149,6 +153,8 @@ export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupRes
   let totalFetched = 0;
   let totalInserted = 0;
   let totalSkipped = 0;
+  let totalErrors = 0;
+  let lastError: Error | undefined;
 
   for (const startUrl of startUrls) {
     let url: string | null = startUrl;
@@ -175,36 +181,46 @@ export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupRes
           continue;
         }
 
-        const activity = normalizeGitHubEvent(enrichPayload(event), userId);
+        // Isolate per-event failures: a single malformed event (unexpected
+        // Events API shape, transient insert error) must not abort the whole
+        // catchup run and silently drop every subsequent event.
+        try {
+          const activity = normalizeGitHubEvent(enrichPayload(event), userId);
 
-        if (activity === null) {
+          if (activity === null) {
+            totalSkipped++;
+            continue;
+          }
+
+          const [inserted] = await db
+            .insert(schema.activityEvents)
+            .values({
+              id: activity.id,
+              userId,
+              integrationId,
+              provider: 'github',
+              eventType: activity.eventType,
+              externalId: activity.sourceId,
+              title: activity.title,
+              url: activity.url,
+              metadata: activity.metadata,
+              occurredAt: new Date(activity.occurredAt),
+            })
+            .onConflictDoNothing({
+              target: [schema.activityEvents.integrationId, schema.activityEvents.externalId],
+            })
+            .returning({ id: schema.activityEvents.id });
+
+          if (inserted) {
+            totalInserted++;
+          } else {
+            totalSkipped++;
+          }
+        } catch (err) {
+          // Count as skipped and surface context without aborting the loop.
           totalSkipped++;
-          continue;
-        }
-
-        const [inserted] = await db
-          .insert(schema.activityEvents)
-          .values({
-            id: activity.id,
-            userId,
-            integrationId,
-            provider: 'github',
-            eventType: activity.eventType,
-            externalId: activity.sourceId,
-            title: activity.title,
-            url: activity.url,
-            metadata: activity.metadata,
-            occurredAt: new Date(activity.occurredAt),
-          })
-          .onConflictDoNothing({
-            target: [schema.activityEvents.integrationId, schema.activityEvents.externalId],
-          })
-          .returning({ id: schema.activityEvents.id });
-
-        if (inserted) {
-          totalInserted++;
-        } else {
-          totalSkipped++;
+          totalErrors++;
+          lastError = err instanceof Error ? err : new Error(String(err));
         }
       }
 
@@ -215,7 +231,13 @@ export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupRes
     }
   }
 
-  return { fetched: totalFetched, inserted: totalInserted, skipped: totalSkipped };
+  return {
+    fetched: totalFetched,
+    inserted: totalInserted,
+    skipped: totalSkipped,
+    errors: totalErrors,
+    ...(lastError ? { lastError } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------

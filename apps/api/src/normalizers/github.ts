@@ -17,11 +17,13 @@ interface GitHubPullRequestPayload {
     created_at: string;
     updated_at: string;
     state: string;
-    user: { login: string };
-    base: { ref: string; repo: { full_name: string } };
+    // Optional: the GitHub Events API (catchup) can omit `user` for ghost /
+    // deleted authors, and `base` is not present on every event subtype.
+    user?: { login: string } | null;
+    base?: { ref: string; repo: { full_name: string } } | null;
   };
   repository: { full_name: string };
-  sender: { login: string };
+  sender?: { login: string } | null;
 }
 
 interface GitHubPushPayload {
@@ -35,7 +37,7 @@ interface GitHubPushPayload {
     timestamp: string;
   }>;
   repository: { full_name: string; html_url: string };
-  pusher: { name: string };
+  pusher?: { name: string } | null;
 }
 
 interface GitHubIssuePayload {
@@ -50,10 +52,10 @@ interface GitHubIssuePayload {
     created_at: string;
     updated_at: string;
     closed_at: string | null;
-    user: { login: string };
+    user?: { login: string } | null;
   };
   repository: { full_name: string };
-  sender: { login: string };
+  sender?: { login: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,10 +99,10 @@ function normalizePullRequest(payload: GitHubPullRequestPayload, userId: string)
     metadata: {
       prNumber: pr.number,
       repo: payload.repository.full_name,
-      author: pr.user.login,
-      sender: payload.sender.login,
+      author: pr.user?.login ?? null,
+      sender: payload.sender?.login ?? null,
       state: pr.state,
-      baseBranch: pr.base.ref,
+      baseBranch: pr.base?.ref ?? null,
     },
     occurredAt,
     ingestedAt: new Date().toISOString(),
@@ -130,7 +132,7 @@ function normalizePush(payload: GitHubPushPayload, userId: string): Activity | n
       commitCount: count,
       headSha: payload.after,
       repo: payload.repository.full_name,
-      pusher: payload.pusher.name,
+      pusher: payload.pusher?.name ?? null,
     },
     occurredAt: firstCommit.timestamp,
     ingestedAt: new Date().toISOString(),
@@ -157,8 +159,8 @@ function normalizeIssue(payload: GitHubIssuePayload, userId: string): Activity |
     metadata: {
       issueNumber: issue.number,
       repo: payload.repository.full_name,
-      author: issue.user.login,
-      sender: payload.sender.login,
+      author: issue.user?.login ?? null,
+      sender: payload.sender?.login ?? null,
       state: issue.state,
     },
     occurredAt,
