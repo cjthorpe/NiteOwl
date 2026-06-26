@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { runGitHubRepoScan } from './github-repo-scan.js';
+import { encodeRepoPath, runGitHubRepoScan } from './github-repo-scan.js';
 
 // ---------------------------------------------------------------------------
 // Mock global fetch so tests never hit the network. Responses are routed by
@@ -305,5 +305,55 @@ describe('runGitHubRepoScan — multi-contributor ingestion', () => {
         until: UNTIL,
       }),
     ).rejects.toThrow('GitHub API error: 500');
+  });
+
+  // FUL-98 regression: encodeURIComponent('owner/repo') -> 'owner%2Frepo', which
+  // GitHub 404s (it does not decode %2F in a path). fetchAllPages then swallows
+  // the 404 as a deleted repo and returns [], silently dropping every commit/PR
+  // (the reposScanned:1 total:0 errors:0 blackout). The commit/PR request paths
+  // must carry a literal slash between owner and repo.
+  it('requests commits/PRs with a literal slash, never %2F (FUL-98)', async () => {
+    routeFetch({
+      repos: [
+        {
+          id: 1,
+          full_name: 'cjthorpe/NiteOwl',
+          html_url: 'https://github.com/cjthorpe/NiteOwl',
+          pushed_at: inWindow,
+        },
+      ],
+      commits: { 'cjthorpe/NiteOwl': [makeCommit('aaa111', 'Chris Thorpe')] },
+    });
+
+    const { db } = makeDb();
+
+    const result = await runGitHubRepoScan({
+      db: db as unknown as Parameters<typeof runGitHubRepoScan>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      accessToken: 'ghp_test',
+      since: SINCE,
+      until: UNTIL,
+    });
+
+    // The repo's commits are reachable, so they ingest (the bug returned 0).
+    expect(result.ingested).toBe(1);
+
+    const requestedUrls = mockFetch.mock.calls.map((c) => c[0] as string);
+    expect(requestedUrls.some((u) => u.includes('/repos/cjthorpe/NiteOwl/commits'))).toBe(true);
+    expect(requestedUrls.some((u) => u.includes('/repos/cjthorpe/NiteOwl/pulls'))).toBe(true);
+    expect(requestedUrls.some((u) => u.includes('%2F'))).toBe(false);
+  });
+});
+
+describe('encodeRepoPath', () => {
+  it('preserves the owner/repo slash instead of encoding it to %2F', () => {
+    expect(encodeRepoPath('cjthorpe/NiteOwl')).toBe('cjthorpe/NiteOwl');
+  });
+
+  it('still escapes unsafe characters within each segment', () => {
+    // Repo names allow ., -, _ (left intact); a space would be escaped.
+    expect(encodeRepoPath('acme/my repo')).toBe('acme/my%20repo');
+    expect(encodeRepoPath('acme/repo.name-1_2')).toBe('acme/repo.name-1_2');
   });
 });
