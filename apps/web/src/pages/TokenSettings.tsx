@@ -407,7 +407,11 @@ function TokenRow({ token, onRevoke }: TokenRowProps) {
         {rowError && (
           <p
             role="alert"
-            style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}
+            style={{
+              margin: 'var(--space-1) 0 0',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-danger)',
+            }}
           >
             {rowError}
           </p>
@@ -491,9 +495,7 @@ export function TokenSettings() {
   const [revealed, setRevealed] = useState<CreatedToken | null>(null);
 
   async function handleCreate(name: string, expiresInDays: number | null) {
-    const created = await create(
-      expiresInDays === null ? { name } : { name, expiresInDays },
-    );
+    const created = await create(expiresInDays === null ? { name } : { name, expiresInDays });
     setRevealed(created);
   }
 

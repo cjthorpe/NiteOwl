@@ -64,7 +64,9 @@ describe('formatLastUsed', () => {
   it('formats recent usage in minutes/hours/days', () => {
     expect(formatLastUsed(new Date(NOW - 30 * 1000).toISOString(), NOW)).toBe('Used just now');
     expect(formatLastUsed(new Date(NOW - 5 * 60 * 1000).toISOString(), NOW)).toBe('Used 5m ago');
-    expect(formatLastUsed(new Date(NOW - 3 * 60 * 60 * 1000).toISOString(), NOW)).toBe('Used 3h ago');
+    expect(formatLastUsed(new Date(NOW - 3 * 60 * 60 * 1000).toISOString(), NOW)).toBe(
+      'Used 3h ago',
+    );
     expect(formatLastUsed(new Date(NOW - 2 * DAY).toISOString(), NOW)).toBe('Used 2d ago');
   });
 });
