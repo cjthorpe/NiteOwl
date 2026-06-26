@@ -11,6 +11,7 @@ import { emailAuthRoutes } from './email.js';
 import { githubAuthRoutes } from './github.js';
 import { linearAuthRoutes } from './linear.js';
 import { passwordResetRoutes } from './password-reset.js';
+import { tokenRoutes } from './tokens.js';
 
 export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) => {
   const { db } = opts;
@@ -26,6 +27,9 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
   // ── Password reset (forgot-password + reset-password) ─────────────────────
   fastify.register(passwordResetRoutes, { ...opts, prefix: '' });
+
+  // ── Personal access tokens (create / list / revoke) ───────────────────────
+  fastify.register(tokenRoutes, { ...opts, prefix: '' });
 
   // ── POST /auth/refresh ────────────────────────────────────────────────────
   fastify.post('/refresh', {

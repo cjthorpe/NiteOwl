@@ -65,16 +65,17 @@ export function buildApp(opts: BuildAppOptions = {}) {
     },
   });
 
-  // ── Auth: JWT decode + request.user decoration ────────────────────────────
-  app.register(authPlugin);
-
-  // ── Redis: caching layer ───────────────────────────────────────────────────
-  app.register(redisPlugin);
-
   // ── DB ─────────────────────────────────────────────────────────────────────
+  // Created before the auth plugin so the PAT branch can look tokens up.
   const db =
     opts.db ??
     createDb(process.env['DATABASE_URL'] ?? 'postgres://niteowl:niteowl@localhost:5432/niteowl');
+
+  // ── Auth: JWT / PAT decode + request.user decoration ──────────────────────
+  app.register(authPlugin, { db });
+
+  // ── Redis: caching layer ───────────────────────────────────────────────────
+  app.register(redisPlugin);
 
   // ── BullMQ: normalization queue + worker ──────────────────────────────────
   // Only wired up in production (when no injected mock db is present).
