@@ -44,17 +44,39 @@ vi.mock('../lib/linear-catchup.js', () => ({
   runLinearCatchup: mockRunLinearCatchup,
 }));
 
+const mockRunGitHubRepoScan = vi.fn();
+
+vi.mock('../lib/github-repo-scan.js', () => ({
+  runGitHubRepoScan: mockRunGitHubRepoScan,
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeDb(linearRows: Array<{ integrationId: string; userId: string; accessToken: string }>) {
-  // Returns a chainable drizzle-like stub.
+interface LinearRow {
+  integrationId: string;
+  userId: string;
+  accessToken: string;
+}
+
+interface GithubRow {
+  integrationId: string;
+  userId: string;
+  configJson: { repoAllowlist?: unknown } | null;
+  accessToken: string;
+}
+
+function makeDb(linearRows: LinearRow[], githubRows: GithubRow[] = []) {
+  // The processor runs the Linear integration query first, then the GitHub one.
+  // `.where` terminates each select chain, so resolve linear rows on the first
+  // call and github rows on the second. `.update(...).set(...).where(...)` (the
+  // lastSyncedAt stamp) is not exercised here.
   const query = {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     innerJoin: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValue(linearRows),
+    where: vi.fn().mockResolvedValueOnce(linearRows).mockResolvedValueOnce(githubRows),
   };
   return query as unknown as Parameters<
     (typeof import('./overnight-catchup.worker.js'))['createOvernightCatchupWorker']
@@ -70,9 +92,10 @@ describe('overnight-catchup worker', () => {
 
   beforeEach(() => {
     capturedProcessor = null;
-    // Only reset the per-test mock (not the Worker module mock whose
+    // Only reset the per-test mocks (not the Worker module mock whose
     // implementation must survive across tests in this file).
     mockRunLinearCatchup.mockReset();
+    mockRunGitHubRepoScan.mockReset();
   });
 
   it('processes all active Linear integrations and accumulates ingested count', async () => {
@@ -148,6 +171,80 @@ describe('overnight-catchup worker', () => {
   it('exports the correct queue name constant', async () => {
     const { OVERNIGHT_CATCHUP_QUEUE } = await import('./overnight-catchup.worker.js');
     expect(OVERNIGHT_CATCHUP_QUEUE).toBe('overnight-catchup');
+  });
+
+  // FUL-98: GitHub integrations are ingested via the deterministic repo-scan
+  // source, not the user-scoped Events API. No githubLogin is required — the
+  // scan only needs the access token — and the allowlist config is passed
+  // through so per-integration scoping (FUL-82) is preserved.
+  it('processes GitHub integrations via repo-scan and accumulates ingested count', async () => {
+    const { createOvernightCatchupWorker } = await import('./overnight-catchup.worker.js');
+
+    mockRunGitHubRepoScan.mockResolvedValueOnce({
+      reposScanned: 1,
+      ingested: 4,
+      total: 4,
+      errors: 0,
+    });
+
+    const db = makeDb(
+      [],
+      [
+        {
+          integrationId: 'gh-int-1',
+          userId: 'gh-user-1',
+          configJson: { repoAllowlist: ['acme/app'] },
+          accessToken: 'gh-tok-1',
+        },
+      ],
+    );
+
+    createOvernightCatchupWorker(db, redisOptions);
+
+    await expect(capturedProcessor!({ id: 'job-gh' })).resolves.toBeUndefined();
+
+    expect(mockRunGitHubRepoScan).toHaveBeenCalledTimes(1);
+    expect(mockRunGitHubRepoScan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db,
+        userId: 'gh-user-1',
+        integrationId: 'gh-int-1',
+        accessToken: 'gh-tok-1',
+        config: { repoAllowlist: ['acme/app'] },
+        since: expect.any(Date),
+        until: expect.any(Date),
+      }),
+    );
+  });
+
+  it('continues past a failed GitHub repo-scan without aborting the job', async () => {
+    const { createOvernightCatchupWorker } = await import('./overnight-catchup.worker.js');
+
+    mockRunGitHubRepoScan
+      .mockRejectedValueOnce(new Error('GitHub API down'))
+      .mockResolvedValueOnce({ reposScanned: 2, ingested: 5, total: 5, errors: 0 });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const db = makeDb(
+      [],
+      [
+        { integrationId: 'gh-fail', userId: 'u1', configJson: null, accessToken: 't1' },
+        { integrationId: 'gh-ok', userId: 'u2', configJson: null, accessToken: 't2' },
+      ],
+    );
+
+    createOvernightCatchupWorker(db, redisOptions);
+
+    await expect(capturedProcessor!({ id: 'job-gh-err' })).resolves.toBeUndefined();
+
+    expect(mockRunGitHubRepoScan).toHaveBeenCalledTimes(2);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('gh-fail'),
+      expect.any(String),
+    );
+
+    consoleErrorSpy.mockRestore();
   });
 });
 
