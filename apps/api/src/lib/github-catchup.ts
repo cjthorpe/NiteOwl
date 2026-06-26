@@ -15,8 +15,11 @@ import { isRepoAllowed, type RepoAllowlistConfig } from './repo-allowlist.js';
 interface GitHubEvent {
   id: string;
   type: string;
-  actor: { id: number; login: string };
-  repo: { id: number; name: string };
+  // The Events API can omit `actor` (ghost / deleted accounts) and, rarely,
+  // `repo`. Model them as optional so reads are forced through null-safe access
+  // and a single malformed item cannot throw and abort the catchup run.
+  actor?: { id: number; login: string } | null;
+  repo?: { id: number; name: string } | null;
   payload: Record<string, unknown>;
   created_at: string;
 }
@@ -255,16 +258,22 @@ export async function runGitHubCatchup(opts: CatchupOptions): Promise<CatchupRes
  * receives what it expects.
  */
 function enrichPayload(event: GitHubEvent): Record<string, unknown> {
+  // Read the event envelope defensively: the Events API can return items with
+  // a missing `actor` (ghost / deleted accounts) or `repo`. Unguarded access
+  // here (e.g. `event.actor.login`) was the FUL-89 crash. Fall back to `null`
+  // so the normalizer's already-null-safe reads (sender, pusher) handle them.
+  const actor = event.actor ?? null;
+  const repoName = event.repo?.name ?? null;
+
   const base: Record<string, unknown> = {
     ...event.payload,
-    repository: event.payload['repository'] ?? {
-      full_name: event.repo.name,
-      html_url: `https://github.com/${event.repo.name}`,
-    },
-    sender: event.payload['sender'] ?? {
-      login: event.actor.login,
-      id: event.actor.id,
-    },
+    repository:
+      event.payload['repository'] ??
+      (repoName != null
+        ? { full_name: repoName, html_url: `https://github.com/${repoName}` }
+        : null),
+    sender:
+      event.payload['sender'] ?? (actor != null ? { login: actor.login, id: actor.id } : null),
   };
 
   if (event.type === 'PushEvent') {
@@ -282,12 +291,15 @@ function enrichPayload(event: GitHubEvent): Record<string, unknown> {
         id: c['id'] ?? c['sha'],
         timestamp: c['timestamp'] ?? event.created_at,
         url:
-          c['url'] ?? `https://github.com/${event.repo.name}/commit/${String(c['sha'] ?? c['id'])}`,
+          c['url'] ??
+          (repoName != null
+            ? `https://github.com/${repoName}/commit/${String(c['sha'] ?? c['id'])}`
+            : null),
       }));
     }
 
     if (!base['pusher']) {
-      base['pusher'] = { name: event.actor.login };
+      base['pusher'] = actor != null ? { name: actor.login } : null;
     }
   }
 
