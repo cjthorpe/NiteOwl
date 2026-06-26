@@ -90,6 +90,20 @@ export async function fetchWithBackoff(url: string, token: string, attempt = 0):
 // Paginated fetcher — follows RFC 5988 Link headers
 // ---------------------------------------------------------------------------
 
+/**
+ * Encodes a `owner/repo` full name for use in a GitHub API path.
+ *
+ * `encodeURIComponent('owner/repo')` encodes the slash to `%2F`, which GitHub
+ * does **not** decode in a path — it treats `owner%2Frepo` as a single literal
+ * segment and 404s. `fetchAllPages` then swallows that 404 as a deleted repo and
+ * returns `[]`, so every commit/PR is silently dropped (FUL-98: the
+ * `reposScanned:1 total:0 errors:0` blackout). Encode each segment separately so
+ * the path separator survives while owner/repo are still escaped.
+ */
+export function encodeRepoPath(repoFullName: string): string {
+  return repoFullName.split('/').map(encodeURIComponent).join('/');
+}
+
 export async function fetchAllPages<T>(firstUrl: string, token: string): Promise<T[]> {
   const results: T[] = [];
   let url: string | null = firstUrl;
@@ -187,7 +201,7 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
     // Commits within the window — captures every author, not just the user.
     try {
       const commits = await fetchAllPages<GitHubCommit>(
-        `https://api.github.com/repos/${encodeURIComponent(repoName)}/commits` +
+        `https://api.github.com/repos/${encodeRepoPath(repoName)}/commits` +
           `?since=${since.toISOString()}&until=${until.toISOString()}&per_page=100`,
         accessToken,
       );
@@ -223,7 +237,7 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
     // PRs updated within the window.
     try {
       const prs = await fetchAllPages<GitHubPullRequest>(
-        `https://api.github.com/repos/${encodeURIComponent(repoName)}/pulls` +
+        `https://api.github.com/repos/${encodeRepoPath(repoName)}/pulls` +
           `?state=all&sort=updated&direction=desc&per_page=100`,
         accessToken,
       );
