@@ -129,6 +129,26 @@ export function ForgotPasswordPage() {
           {status === 'submitting' ? 'Sending…' : 'Send reset link'}
         </AuthButton>
       </form>
+
+      {/*
+       * Shown unconditionally to everyone — never branched on whether an account
+       * exists or is OAuth-only — so it leaks no account-existence or auth-method
+       * oracle. GitHub-only accounts have no password to reset (FUL-94).
+       */}
+      <p
+        style={{
+          margin: 0,
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-text-muted)',
+          lineHeight: 1.6,
+        }}
+      >
+        Signed up with GitHub? You don&apos;t have a password — use{' '}
+        <Link to="/login" style={linkStyle}>
+          Continue with GitHub
+        </Link>{' '}
+        to sign in.
+      </p>
     </AuthShell>
   );
 }
