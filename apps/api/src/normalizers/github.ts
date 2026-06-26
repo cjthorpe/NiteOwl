@@ -22,7 +22,9 @@ interface GitHubPullRequestPayload {
     user?: { login: string } | null;
     base?: { ref: string; repo: { full_name: string } } | null;
   };
-  repository: { full_name: string };
+  // The Events API (catchup) can omit `repository` for malformed / repo-less
+  // events; guard reads with a fallback rather than dereferencing blindly.
+  repository?: { full_name: string } | null;
   sender?: { login: string } | null;
 }
 
@@ -36,7 +38,7 @@ interface GitHubPushPayload {
     url: string;
     timestamp: string;
   }>;
-  repository: { full_name: string; html_url: string };
+  repository?: { full_name: string; html_url: string } | null;
   pusher?: { name: string } | null;
 }
 
@@ -54,13 +56,16 @@ interface GitHubIssuePayload {
     closed_at: string | null;
     user?: { login: string } | null;
   };
-  repository: { full_name: string };
+  repository?: { full_name: string } | null;
   sender?: { login: string } | null;
 }
 
 // ---------------------------------------------------------------------------
 // Event type resolution
 // ---------------------------------------------------------------------------
+
+/** Fallback repo slug when an Events API item omits `repository`. */
+const UNKNOWN_REPO = 'unknown/unknown';
 
 function resolvePrEventType(action: string, merged: boolean): ActivityEventType | null {
   if (action === 'opened') return 'pr_opened';
@@ -84,6 +89,7 @@ function normalizePullRequest(payload: GitHubPullRequestPayload, userId: string)
   const eventType = resolvePrEventType(action, pr.merged);
   if (eventType === null) return null;
 
+  const repoName = payload.repository?.full_name ?? UNKNOWN_REPO;
   const occurredAt =
     eventType === 'pr_merged' && pr.merged_at != null ? pr.merged_at : pr.updated_at;
 
@@ -93,12 +99,12 @@ function normalizePullRequest(payload: GitHubPullRequestPayload, userId: string)
     provider: 'github',
     eventType,
     sourceId: `pr:${pr.id}:${action}`,
-    title: `[${payload.repository.full_name}] PR #${pr.number}: ${pr.title}`,
+    title: `[${repoName}] PR #${pr.number}: ${pr.title}`,
     ...(pr.body != null ? { description: pr.body } : {}),
     url: pr.html_url,
     metadata: {
       prNumber: pr.number,
-      repo: payload.repository.full_name,
+      repo: repoName,
       author: pr.user?.login ?? null,
       sender: payload.sender?.login ?? null,
       state: pr.state,
@@ -116,6 +122,8 @@ function normalizePush(payload: GitHubPushPayload, userId: string): Activity | n
   const firstCommit = commits[0]!;
   const count = commits.length;
   const branch = payload.ref.replace('refs/heads/', '');
+  const repoName = payload.repository?.full_name ?? UNKNOWN_REPO;
+  const repoUrl = payload.repository?.html_url ?? `https://github.com/${repoName}`;
 
   return {
     id: crypto.randomUUID(),
@@ -123,15 +131,15 @@ function normalizePush(payload: GitHubPushPayload, userId: string): Activity | n
     provider: 'github',
     eventType: 'commit_pushed',
     sourceId: `push:${payload.after}`,
-    title: `[${payload.repository.full_name}] ${count} commit${count > 1 ? 's' : ''} pushed to ${branch}`,
+    title: `[${repoName}] ${count} commit${count > 1 ? 's' : ''} pushed to ${branch}`,
     description: firstCommit.message,
-    url: `${payload.repository.html_url}/commit/${payload.after}`,
+    url: `${repoUrl}/commit/${payload.after}`,
     metadata: {
       ref: payload.ref,
       branch,
       commitCount: count,
       headSha: payload.after,
-      repo: payload.repository.full_name,
+      repo: repoName,
       pusher: payload.pusher?.name ?? null,
     },
     occurredAt: firstCommit.timestamp,
@@ -144,6 +152,7 @@ function normalizeIssue(payload: GitHubIssuePayload, userId: string): Activity |
   const eventType = resolveIssueEventType(action);
   if (eventType === null) return null;
 
+  const repoName = payload.repository?.full_name ?? UNKNOWN_REPO;
   const occurredAt =
     eventType === 'issue_closed' && issue.closed_at != null ? issue.closed_at : issue.updated_at;
 
@@ -153,12 +162,12 @@ function normalizeIssue(payload: GitHubIssuePayload, userId: string): Activity |
     provider: 'github',
     eventType,
     sourceId: `issue:${issue.id}:${action}`,
-    title: `[${payload.repository.full_name}] Issue #${issue.number}: ${issue.title}`,
+    title: `[${repoName}] Issue #${issue.number}: ${issue.title}`,
     ...(issue.body != null ? { description: issue.body } : {}),
     url: issue.html_url,
     metadata: {
       issueNumber: issue.number,
-      repo: payload.repository.full_name,
+      repo: repoName,
       author: issue.user?.login ?? null,
       sender: payload.sender?.login ?? null,
       state: issue.state,

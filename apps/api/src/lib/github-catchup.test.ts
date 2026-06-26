@@ -234,6 +234,207 @@ describe('GitHub catchup — enrichPayload (Events API shape)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Actor-less / minimal Events API items (FUL-89)
+//
+// `enrichPayload` previously read `event.actor.login` unguarded, so a GitHub
+// Events API item with no `actor` (ghost / deleted account) threw a TypeError
+// that escaped to the call site and aborted the whole catchup run. These tests
+// feed actor-less PR and push events through the full enrich → normalize →
+// insert pipeline and assert the run survives and ingests them.
+// ---------------------------------------------------------------------------
+
+describe('GitHub catchup — actor-less Events API events (FUL-89)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const emptySecondPage = () =>
+    ({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => [],
+    }) as unknown as Response;
+
+  const firstPage = (events: unknown[]) =>
+    ({
+      ok: true,
+      headers: new Map([
+        ['x-ratelimit-remaining', '50'],
+        ['x-ratelimit-reset', String(Math.floor(Date.now() / 1000) + 3600)],
+        ['link', ''],
+      ]),
+      json: async () => events,
+    }) as unknown as Response;
+
+  it('ingests an actor-less PullRequestEvent without throwing', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+
+    // No `actor` key at all — the FUL-89 crash trigger.
+    const actorlessPr = {
+      id: 'evt-pr-noactor',
+      type: 'PullRequestEvent',
+      repo: { id: 5, name: 'acme/widgets' },
+      payload: {
+        action: 'opened',
+        pull_request: {
+          id: 101,
+          number: 7,
+          title: 'Add widget',
+          body: null,
+          html_url: 'https://github.com/acme/widgets/pull/7',
+          merged: false,
+          merged_at: null,
+          created_at: recent,
+          updated_at: recent,
+          state: 'open',
+          // user omitted too (ghost author)
+        },
+      },
+      created_at: recent,
+    };
+
+    mockFetch.mockResolvedValueOnce(firstPage([actorlessPr]));
+    mockFetch.mockResolvedValueOnce(emptySecondPage());
+
+    const insertedRows: Array<{ metadata?: { sender?: unknown; repo?: string } }> = [];
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockImplementation((row: { metadata?: { sender?: unknown } }) => {
+        insertedRows.push(row);
+        return db;
+      }),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'inserted-id' }]),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'octocat',
+      accessToken: 'ghp_test',
+      lookbackHours: 24,
+    });
+
+    // Survives the missing actor and ingests the PR with a null sender.
+    expect(result.inserted).toBe(1);
+    expect(result.errors).toBe(0);
+    expect(insertedRows[0]?.metadata?.sender).toBeNull();
+    expect(insertedRows[0]?.metadata?.repo).toBe('acme/widgets');
+  });
+
+  it('ingests an actor-less PushEvent with a null pusher', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+
+    const actorlessPush = {
+      id: 'evt-push-noactor',
+      type: 'PushEvent',
+      actor: null, // explicitly null actor
+      repo: { id: 6, name: 'acme/api' },
+      payload: {
+        ref: 'refs/heads/main',
+        head: 'feedface',
+        before: '00000000',
+        commits: [{ sha: 'feedface', message: 'chore: bump' }],
+      },
+      created_at: recent,
+    };
+
+    mockFetch.mockResolvedValueOnce(firstPage([actorlessPush]));
+    mockFetch.mockResolvedValueOnce(emptySecondPage());
+
+    const insertedRows: Array<{ metadata?: { pusher?: unknown } }> = [];
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockImplementation((row: { metadata?: { pusher?: unknown } }) => {
+        insertedRows.push(row);
+        return db;
+      }),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'inserted-id' }]),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'dev',
+      accessToken: 'ghp_test',
+      lookbackHours: 24,
+    });
+
+    expect(result.inserted).toBe(1);
+    expect(result.errors).toBe(0);
+    expect(insertedRows[0]?.metadata?.pusher).toBeNull();
+  });
+
+  it('does not abort the run: a malformed actor-less event is isolated from valid ones', async () => {
+    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+
+    // An item missing both `actor` and `repo` — enrichPayload must not throw;
+    // it yields a record the normalizer accepts (repo falls back), so it still
+    // ingests rather than dropping the whole page.
+    const minimalPush = {
+      id: 'evt-minimal',
+      type: 'PushEvent',
+      payload: {
+        ref: 'refs/heads/main',
+        head: 'beadfeed',
+        commits: [{ sha: 'beadfeed', message: 'wip' }],
+      },
+      created_at: recent,
+    };
+
+    const healthyPush = {
+      id: 'evt-healthy',
+      type: 'PushEvent',
+      actor: { id: 1, login: 'dev' },
+      repo: { id: 1, name: 'acme/app' },
+      payload: {
+        ref: 'refs/heads/main',
+        head: 'cafef00d',
+        commits: [{ sha: 'cafef00d', message: 'feat: ok' }],
+      },
+      created_at: recent,
+    };
+
+    mockFetch.mockResolvedValueOnce(firstPage([minimalPush, healthyPush]));
+    mockFetch.mockResolvedValueOnce(emptySecondPage());
+
+    const db = {
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      onConflictDoNothing: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'inserted-id' }]),
+    };
+
+    const { runGitHubCatchup } = await import('./github-catchup.js');
+
+    const result = await runGitHubCatchup({
+      db: db as unknown as Parameters<typeof runGitHubCatchup>[0]['db'],
+      userId: 'user-1',
+      integrationId: 'int-1',
+      githubLogin: 'dev',
+      accessToken: 'ghp_test',
+      lookbackHours: 24,
+    });
+
+    // Both events ingest; the malformed one does not crash or drop the healthy
+    // one that follows it on the same page.
+    expect(result.inserted).toBe(2);
+    expect(result.errors).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Per-integration repo allowlist (FUL-82)
 // ---------------------------------------------------------------------------
 
