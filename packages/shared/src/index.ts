@@ -24,6 +24,14 @@ export {
   resolvePlanTier,
 } from './entitlements';
 
+export type {
+  LicenceFailureReason,
+  LicencePayload,
+  LicenceVerifyResult,
+  VerifyLicenceOptions,
+} from './licence';
+export { LICENCE_FORMAT_VERSION, licencePlanOrFree, verifyLicence } from './licence';
+
 export function ok<T>(data: T): ApiResponse<T> {
   return { success: true, data, error: null };
 }

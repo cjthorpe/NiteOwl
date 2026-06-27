@@ -3,6 +3,7 @@
 import { runMigrations } from '@niteowl/db';
 import { buildApp } from './app.js';
 import { missingEmailConfig } from './lib/email.js';
+import { resolveDeploymentPlan } from './lib/licence/entitlement-source.js';
 
 const DATABASE_URL =
   process.env['DATABASE_URL'] ?? 'postgres://niteowl:niteowl_dev_password@localhost:5432/niteowl';
@@ -37,6 +38,16 @@ async function start() {
   } catch (err) {
     console.error('[migrate] Migration failed — cannot start:', err);
     process.exit(1);
+  }
+
+  // Resolve the self-hosted entitlement tier from the signed licence key, if
+  // any. Fails closed to `free` and never throws — a missing/invalid licence
+  // must never block startup. No key material is ever logged, only the tier.
+  try {
+    const plan = resolveDeploymentPlan();
+    console.log(`[licence] entitlements tier: ${plan}`);
+  } catch {
+    console.warn('[licence] entitlements resolution failed; defaulting to free tier.');
   }
 
   const app = buildApp();
