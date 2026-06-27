@@ -24,11 +24,10 @@
  *  - Per-integration results are logged at info level.
  */
 
-import { Worker } from 'bullmq';
-import { and, eq } from 'drizzle-orm';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { Worker } from 'bullmq';
+import { and, eq } from 'drizzle-orm';
 
 import { runLinearCatchup } from '../lib/linear-catchup.js';
 

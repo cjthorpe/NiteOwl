@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
-
-import { requireAuth } from '../../plugins/auth.js';
 import { runGitHubRepoScan } from '../../lib/github-repo-scan.js';
+import { requireAuth } from '../../plugins/auth.js';
 
 // Re-exported so existing tests (and callers) keep importing the GitHub REST
 // fetch helpers from this module. The implementations now live in the shared

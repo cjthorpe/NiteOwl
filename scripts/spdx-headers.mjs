@@ -28,9 +28,8 @@
 // always surfaced as an error for a human to resolve.
 
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { join, relative, sep , dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, '..');

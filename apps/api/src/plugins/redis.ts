@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import fp from 'fastify-plugin';
 import type { FastifyPluginAsync } from 'fastify';
+import fp from 'fastify-plugin';
 import { Redis } from 'ioredis';
 
 declare module 'fastify' {

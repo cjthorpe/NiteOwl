@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { fetchWithBackoff, fetchAllPages } from './github-catchup-route.js';
 import { isRepoAllowed } from '../../lib/repo-allowlist.js';
+
+import { fetchWithBackoff, fetchAllPages } from './github-catchup-route.js';
 
 // ---------------------------------------------------------------------------
 // Mock global fetch so tests never hit the network

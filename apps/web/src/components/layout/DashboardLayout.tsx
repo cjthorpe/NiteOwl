@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+
+import { ErrorBoundary } from '../ui/ErrorBoundary';
+
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
-import { ErrorBoundary } from '../ui/ErrorBoundary';
 import './layout.css';
 
 export function DashboardLayout() {

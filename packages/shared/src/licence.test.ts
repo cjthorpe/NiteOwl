@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { generateKeyPairSync, sign as edSign, type KeyObject } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import { hasFeature, type PlanTier } from './entitlements';

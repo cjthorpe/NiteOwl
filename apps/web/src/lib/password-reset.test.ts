@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { requestPasswordReset, resetPassword } from './password-reset';
 
 /**

@@ -30,7 +30,7 @@ import { generateKeyPairSync, sign as edSign, type KeyObject } from 'node:crypto
 import { LICENCE_FORMAT_VERSION, type LicencePayload } from '@niteowl/shared';
 
 /** Algorithm is fixed to Ed25519 — never negotiated, never written to a token. */
-const KEY_TYPE = 'ed25519' as const;
+const KEY_TYPE = 'ed25519';
 
 /** A freshly minted Ed25519 keypair, both halves as PEM strings. */
 export interface LicenceKeyPair {

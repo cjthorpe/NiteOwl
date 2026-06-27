@@ -6,6 +6,7 @@ export { normalizeLinearEvent } from './linear.js';
 export { normalizeSlackEvent } from './slack.js';
 
 import type { Activity, ActivityProvider } from '@niteowl/types';
+
 import { normalizeGitHubEvent } from './github.js';
 import { normalizeJiraEvent } from './jira.js';
 import { normalizeLinearEvent } from './linear.js';

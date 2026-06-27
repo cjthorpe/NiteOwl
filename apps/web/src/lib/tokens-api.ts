@@ -14,8 +14,7 @@
 
 import { authedFetch } from './auth';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 /** Token metadata as returned by the list endpoint — never includes the value. */
 export interface PersonalAccessToken {

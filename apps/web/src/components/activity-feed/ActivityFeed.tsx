@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import './activity-feed.css';
+import type { ActivityProvider } from '@niteowl/types';
+
 import { useFeed } from '../../hooks/useFeed';
 import { useFilters } from '../../hooks/useFilters';
 import type { TimeRange } from '../../types/filters';
-import type { ActivityProvider } from '@niteowl/types';
 import { FilterBar } from '../filter-bar/FilterBar';
+
 import { ActivityCard } from './ActivityCard';
 import { ActivityFeedSkeleton } from './ActivityCardSkeleton';
 import { EmptyState } from './EmptyState';
@@ -103,7 +105,7 @@ export function ActivityFeed() {
                 fontSize: 'var(--text-xs)',
               }}
             >
-              You're all caught up
+              You&apos;re all caught up
             </p>
           )}
         </>

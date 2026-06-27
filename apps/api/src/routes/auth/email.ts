@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { eq } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { sha256 } from '../../lib/crypto.js';
 import { signAccessToken, signRefreshToken } from '../../lib/jwt.js';
@@ -76,7 +75,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, {
         expiresAt,
       });
 
-      reply.setCookie(REFRESH_COOKIE, rawRefresh, {
+      void reply.setCookie(REFRESH_COOKIE, rawRefresh, {
         httpOnly: true,
         sameSite: 'strict',
         secure: process.env['NODE_ENV'] === 'production',
@@ -145,7 +144,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, {
         expiresAt,
       });
 
-      reply.setCookie(REFRESH_COOKIE, rawRefresh, {
+      void reply.setCookie(REFRESH_COOKIE, rawRefresh, {
         httpOnly: true,
         sameSite: 'strict',
         secure: process.env['NODE_ENV'] === 'production',

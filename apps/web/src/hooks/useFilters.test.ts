@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { renderHook, act } from '@testing-library/react';
+import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
-import React from 'react';
+
 import { useFilters } from './useFilters';
 
 function wrapper({ initialSearch = '' }: { initialSearch?: string } = {}) {

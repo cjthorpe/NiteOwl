@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { Worker } from 'bullmq';
-import type { Queue } from 'bullmq';
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
 import type { Activity, NormalizationJobData, SlackAlertJobData } from '@niteowl/types';
+import type { Queue } from 'bullmq';
+import { Worker } from 'bullmq';
+
 import { normalizeEvent } from '../normalizers/index.js';
 import { invalidateFeedCache } from '../routes/feed/index.js';
 import { getEnabledAlertsForUser } from '../routes/slack-alerts/index.js';
@@ -180,7 +181,7 @@ async function enqueueSlackAlerts(
   activity: Activity,
   queue: Queue<SlackAlertJobData>,
 ): Promise<void> {
-  const meta = activity.metadata as Record<string, unknown>;
+  const meta = activity.metadata;
   const repo = typeof meta['repo'] === 'string' ? meta['repo'] : null;
   const prNumber = typeof meta['prNumber'] === 'number' ? meta['prNumber'] : 0;
   // `author` = PR creator login; `sender` = who triggered the merge action

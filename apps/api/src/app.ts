@@ -3,21 +3,22 @@
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import Fastify from 'fastify';
-import type { HealthStatus } from '@niteowl/types';
 import { createDb } from '@niteowl/db';
+import type { HealthStatus } from '@niteowl/types';
+import Fastify from 'fastify';
+
 import authPlugin from './plugins/auth.js';
 import queuePlugin from './plugins/queue.js';
 import redisPlugin from './plugins/redis.js';
+import { agentLoginRoutes } from './routes/agent-logins/index.js';
 import { authRoutes } from './routes/auth/index.js';
 import { feedRoutes } from './routes/feed/index.js';
 import { integrationsRoutes } from './routes/integrations/index.js';
+import { slackAlertRoutes } from './routes/slack-alerts/index.js';
+import { usersRoutes } from './routes/users/index.js';
 import { githubWebhookRoutes } from './routes/webhooks/github.js';
 import { jiraWebhookRoutes } from './routes/webhooks/jira.js';
 import { linearWebhookRoutes } from './routes/webhooks/linear.js';
-import { slackAlertRoutes } from './routes/slack-alerts/index.js';
-import { agentLoginRoutes } from './routes/agent-logins/index.js';
-import { usersRoutes } from './routes/users/index.js';
 
 export interface BuildAppOptions {
   /** Injected in tests; production uses DATABASE_URL env var */
@@ -34,7 +35,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
   });
 
   // ── Security: CORS ─────────────────────────────────────────────────────────
-  app.register(cors, {
+  void app.register(cors, {
     origin: process.env['CORS_ORIGIN'] ?? 'http://localhost:5173',
     credentials: true, // required for cross-origin cookie sending
     // @fastify/cors v11 defaults `methods` to 'GET,HEAD,POST', which omits the
@@ -47,7 +48,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
   // ── Security: Cookie plugin ────────────────────────────────────────────────
   // Signed cookies via HMAC — prevents client-side tampering with cookie values.
   const cookieSecret = process.env['COOKIE_SECRET'] ?? process.env['JWT_SECRET'];
-  app.register(cookie, {
+  void app.register(cookie, {
     ...(cookieSecret !== undefined ? { secret: cookieSecret } : {}),
     parseOptions: {},
   });
@@ -55,7 +56,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
   // ── Security: Rate limiting ────────────────────────────────────────────────
   // Global default: 200 req / min per IP.
   // Auth routes register tighter limits (e.g. 10 req / min) via config.rateLimit.
-  app.register(rateLimit, {
+  void app.register(rateLimit, {
     global: true,
     max: 200,
     timeWindow: '1 minute',
@@ -74,10 +75,10 @@ export function buildApp(opts: BuildAppOptions = {}) {
     createDb(process.env['DATABASE_URL'] ?? 'postgres://niteowl:niteowl@localhost:5432/niteowl');
 
   // ── Auth: JWT / PAT decode + request.user decoration ──────────────────────
-  app.register(authPlugin, { db });
+  void app.register(authPlugin, { db });
 
   // ── Redis: caching layer ───────────────────────────────────────────────────
-  app.register(redisPlugin);
+  void app.register(redisPlugin);
 
   // ── BullMQ: normalization queue + worker ──────────────────────────────────
   // Only wired up in production (when no injected mock db is present).
@@ -85,7 +86,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
   // without processing — matching their existing behaviour.
   const enableQueue = !opts.db;
   if (enableQueue) {
-    app.register(queuePlugin, { db });
+    void app.register(queuePlugin, { db });
   }
 
   // ── Security: HTTP security headers ───────────────────────────────────────
@@ -119,11 +120,11 @@ export function buildApp(opts: BuildAppOptions = {}) {
   app.get('/api/health', healthHandler);
 
   // Auth routes — stricter rate limits applied per-route via config.rateLimit
-  app.register(authRoutes, { prefix: '/auth', db });
+  void app.register(authRoutes, { prefix: '/auth', db });
 
   // Feed + integrations API
-  app.register(feedRoutes, { prefix: '/api/feed', db });
-  app.register(integrationsRoutes, { prefix: '/api/integrations', db });
+  void app.register(feedRoutes, { prefix: '/api/feed', db });
+  void app.register(integrationsRoutes, { prefix: '/api/integrations', db });
 
   // Webhook receivers — no auth, secured by provider-specific signatures.
   // GitHub handler is registered inside app.after() so the queue decoration
@@ -139,23 +140,23 @@ export function buildApp(opts: BuildAppOptions = {}) {
         ).normalizationQueue ?? undefined)
       : undefined;
 
-    app.register(githubWebhookRoutes, {
+    void app.register(githubWebhookRoutes, {
       prefix: '/api/webhooks/github',
       db,
       ...(rawQueue != null ? { queue: rawQueue } : {}),
     });
   });
-  app.register(linearWebhookRoutes, { prefix: '/api/webhooks', db });
-  app.register(jiraWebhookRoutes, { prefix: '/api/webhooks', db });
+  void app.register(linearWebhookRoutes, { prefix: '/api/webhooks', db });
+  void app.register(jiraWebhookRoutes, { prefix: '/api/webhooks', db });
 
   // Slack alert configuration
-  app.register(slackAlertRoutes, { prefix: '/api/slack-alerts', db });
+  void app.register(slackAlertRoutes, { prefix: '/api/slack-alerts', db });
 
   // Agent login registry
-  app.register(agentLoginRoutes, { prefix: '/api/agent-logins', db });
+  void app.register(agentLoginRoutes, { prefix: '/api/agent-logins', db });
 
   // User profile (JWT-derived, no DB hit)
-  app.register(usersRoutes, { prefix: '/api/users' });
+  void app.register(usersRoutes, { prefix: '/api/users' });
 
   return app;
 }

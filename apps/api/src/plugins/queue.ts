@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import fp from 'fastify-plugin';
-import type { FastifyPluginAsync } from 'fastify';
-import { Queue } from 'bullmq';
 
 import type { Db } from '@niteowl/db';
 import type { NormalizationJobData, SlackAlertJobData } from '@niteowl/types';
+import { Queue } from 'bullmq';
+import type { FastifyPluginAsync } from 'fastify';
+import fp from 'fastify-plugin';
+
 import { NORMALIZATION_QUEUE, createNormalizationWorker } from '../workers/normalization.worker.js';
-import { SLACK_ALERT_QUEUE, createSlackAlertWorker } from '../workers/slack-alert.worker.js';
 import {
   OVERNIGHT_CATCHUP_QUEUE,
   createOvernightCatchupWorker,
   type OvernightCatchupJobData,
 } from '../workers/overnight-catchup.worker.js';
+import { SLACK_ALERT_QUEUE, createSlackAlertWorker } from '../workers/slack-alert.worker.js';
 
 // ---------------------------------------------------------------------------
 // Fastify type augmentation

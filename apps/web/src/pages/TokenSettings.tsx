@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+
 import { usePersonalAccessTokens } from '../hooks/usePersonalAccessTokens';
-import type { CreatedToken, PersonalAccessToken } from '../lib/tokens-api';
 import {
   EXPIRY_OPTIONS,
   MAX_NAME_LENGTH,
@@ -11,6 +11,7 @@ import {
   validateTokenName,
   type ExpiryTone,
 } from '../lib/tokens';
+import type { CreatedToken, PersonalAccessToken } from '../lib/tokens-api';
 
 // ---------------------------------------------------------------------------
 // Shared token-color lookup for expiry badges

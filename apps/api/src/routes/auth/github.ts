@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
-
 import { generateOAuthState, sha256, timingSafeCompare } from '../../lib/crypto.js';
-import { signRefreshToken } from '../../lib/jwt.js';
 import { runGitHubRepoScan } from '../../lib/github-repo-scan.js';
+import { signRefreshToken } from '../../lib/jwt.js';
 
 import { REFRESH_COOKIE } from './constants.js';
 
@@ -102,7 +101,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
 
       const state = generateOAuthState();
 
-      reply.setCookie(STATE_COOKIE, state, {
+      void reply.setCookie(STATE_COOKIE, state, {
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env['NODE_ENV'] === 'production',
@@ -137,7 +136,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
         return reply.redirect(`${webRoot}/login?error=state_mismatch`, 302);
       }
 
-      reply.clearCookie(STATE_COOKIE, { path: '/auth/github' });
+      void reply.clearCookie(STATE_COOKIE, { path: '/auth/github' });
 
       if (!code) {
         return reply.redirect(`${webRoot}/login?error=no_code`, 302);
@@ -201,7 +200,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           expiresAt,
         });
 
-        reply.setCookie(REFRESH_COOKIE, rawRefresh, {
+        void reply.setCookie(REFRESH_COOKIE, rawRefresh, {
           httpOnly: true,
           sameSite: 'strict',
           secure: process.env['NODE_ENV'] === 'production',

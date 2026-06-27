@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { useId, useRef } from 'react';
 import type { ActivityProvider } from '@niteowl/types';
+import { useId, useRef } from 'react';
+
 import type { TimeHours } from '../../hooks/useFeedFilters';
 
 const TIME_OPTIONS: TimeHours[] = [8, 12, 24];

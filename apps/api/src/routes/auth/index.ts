@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { eq, gt, isNotNull, isNull, and } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { sha256 } from '../../lib/crypto.js';
 import { signAccessToken, signRefreshToken } from '../../lib/jwt.js';
+
 import { REFRESH_COOKIE } from './constants.js';
 import { emailAuthRoutes } from './email.js';
 import { githubAuthRoutes } from './github.js';
@@ -19,19 +19,19 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
   const { db } = opts;
 
   // ── Email/password register + login ───────────────────────────────────────
-  fastify.register(emailAuthRoutes, { ...opts, prefix: '' });
+  void fastify.register(emailAuthRoutes, { ...opts, prefix: '' });
 
   // ── GitHub OAuth ──────────────────────────────────────────────────────────
-  fastify.register(githubAuthRoutes, { ...opts, prefix: '' });
+  void fastify.register(githubAuthRoutes, { ...opts, prefix: '' });
 
   // ── Linear OAuth ──────────────────────────────────────────────────────────
-  fastify.register(linearAuthRoutes, { ...opts, prefix: '' });
+  void fastify.register(linearAuthRoutes, { ...opts, prefix: '' });
 
   // ── Password reset (forgot-password + reset-password) ─────────────────────
-  fastify.register(passwordResetRoutes, { ...opts, prefix: '' });
+  void fastify.register(passwordResetRoutes, { ...opts, prefix: '' });
 
   // ── Personal access tokens (create / list / revoke) ───────────────────────
-  fastify.register(tokenRoutes, { ...opts, prefix: '' });
+  void fastify.register(tokenRoutes, { ...opts, prefix: '' });
 
   // ── POST /auth/refresh ────────────────────────────────────────────────────
   fastify.post('/refresh', {
@@ -62,7 +62,7 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
       if (!stored) {
         // Token was never issued or has been fully purged — not a replay.
-        reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+        void reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
         return reply.code(401).send({ success: false, error: 'Invalid or expired refresh token' });
       }
 
@@ -72,7 +72,7 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
       // full re-authentication.
       if (stored.rotatedAt !== null) {
         await db.delete(schema.refreshTokens).where(eq(schema.refreshTokens.userId, stored.userId));
-        reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+        void reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
         return reply.code(401).send({
           success: false,
           error: 'Refresh token already used — all sessions revoked',
@@ -81,7 +81,7 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
       // ── Check expiry on a still-active token ─────────────────────────────
       if (stored.expiresAt <= now) {
-        reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+        void reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
         return reply.code(401).send({ success: false, error: 'Invalid or expired refresh token' });
       }
 
@@ -116,7 +116,7 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         expiresAt: newExpiresAt,
       });
 
-      reply.setCookie(REFRESH_COOKIE, newRawRefresh, {
+      void reply.setCookie(REFRESH_COOKIE, newRawRefresh, {
         httpOnly: true,
         sameSite: 'strict',
         secure: process.env['NODE_ENV'] === 'production',
@@ -151,7 +151,7 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         await db.delete(schema.refreshTokens).where(eq(schema.refreshTokens.tokenHash, tokenHash));
       }
 
-      reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+      void reply.clearCookie(REFRESH_COOKIE, { path: '/auth' });
 
       return reply.send({ success: true, data: null, error: null });
     },

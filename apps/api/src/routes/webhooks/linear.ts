@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { createHash, createHmac } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
 
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { and, eq, sql } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { timingSafeCompare } from '../../lib/crypto.js';
 import { normalizeLinearEvent } from '../../normalizers/linear.js';

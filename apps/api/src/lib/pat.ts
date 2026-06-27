@@ -12,10 +12,10 @@
  * tell a PAT apart from a JWT before doing any DB lookup or signature check —
  * which also prevents PATs from being fed into the JWT verifier as a probe.
  */
-import { and, eq, gt, isNull, or } from 'drizzle-orm';
 
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 
 import { generateOpaqueToken, sha256 } from './crypto.js';
 import type { TokenPayload } from './jwt.js';

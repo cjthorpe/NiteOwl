@@ -20,12 +20,11 @@
  * dashboard (Bull Board, Arena, etc.).
  */
 
-import { Worker } from 'bullmq';
-import { and, eq } from 'drizzle-orm';
-
 import type { Db } from '@niteowl/db';
 import { decrypt, schema } from '@niteowl/db';
 import type { SlackAlertJobData } from '@niteowl/types';
+import { Worker } from 'bullmq';
+import { and, eq } from 'drizzle-orm';
 
 import { formatPrMergeAlert, sendSlackAlert } from '../lib/slack-alert.js';
 

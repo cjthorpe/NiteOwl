@@ -8,8 +8,9 @@
  *  - issue_created, issue_updated (in-progress), issue_updated (done → closed),
  *    issue_deleted, comment_created, and non-actionable events
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Redis from 'ioredis';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { buildApp } from '../../app.js';
 
 // ---------------------------------------------------------------------------

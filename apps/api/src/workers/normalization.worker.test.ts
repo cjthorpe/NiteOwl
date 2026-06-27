@@ -6,6 +6,7 @@
  * filtering.
  */
 import { describe, it, expect } from 'vitest';
+
 import { extractAuthorLogin } from './normalization.worker.js';
 
 describe('extractAuthorLogin', () => {

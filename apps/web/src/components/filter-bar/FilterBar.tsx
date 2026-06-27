@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import './filter-bar.css';
+import { type UseFiltersReturn } from '../../hooks/useFilters';
 import {
   EVENT_TYPE_LABELS,
   INTEGRATION_LABELS,
@@ -10,7 +11,7 @@ import {
   type EventType,
   DEFAULT_FILTERS,
 } from '../../types/filters';
-import { type UseFiltersReturn } from '../../hooks/useFilters';
+
 import { EventTypeFilter } from './EventTypeFilter';
 import { FilterChip } from './FilterChip';
 import { IntegrationFilter } from './IntegrationFilter';
