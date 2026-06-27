@@ -6,11 +6,28 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel superseded runs on the same ref to keep PR feedback fast.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
-    name: Lint, Type-check, Test
+  # Build-both-editions matrix: {free, commercial} x {lint, typecheck, test,
+  # build}, all from one SHA. The `free` leg is also the "free-without-ee"
+  # guard — it physically deletes the commercial packages/ee-* code before
+  # installing, so the open-source core must stand on its own. If core ever
+  # imports @niteowl/ee-*, the free leg breaks (install / type-check / build).
+  # See docs/open-core.md.
+  build:
+    name: ${{ matrix.edition }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
+    strategy:
+      # Always run both editions so we see exactly which one regressed.
+      fail-fast: false
+      matrix:
+        edition: [free, commercial]
 
     steps:
       - name: Checkout
@@ -25,8 +42,32 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install dependencies
+      # Free edition guard: remove commercial code BEFORE install so a stray
+      # core dependency on ee-* fails fast at resolution time.
+      - name: Exclude commercial (ee-*) packages — free edition guard
+        if: matrix.edition == 'free'
+        run: ./scripts/ci/exclude-ee.sh
+
+      # Turborepo cache, keyed per edition (free/commercial have different
+      # inputs and must not share artifacts). restore-keys lets a new SHA warm
+      # from the most recent run of the same edition.
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ matrix.edition }}-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ matrix.edition }}-${{ runner.os }}-
+
+      # Commercial: lockfile must be exact. Free: workspace was mutated above,
+      # so the committed lockfile no longer matches — re-resolve is expected.
+      - name: Install dependencies (commercial)
+        if: matrix.edition == 'commercial'
         run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (free)
+        if: matrix.edition == 'free'
+        run: pnpm install --no-frozen-lockfile
 
       - name: Lint
         run: pnpm lint
@@ -37,8 +78,8 @@ jobs:
       - name: Type-check
         run: pnpm typecheck
 
-      - name: Build shared
-        run: pnpm --filter @niteowl/shared build
+      - name: Build
+        run: pnpm build
 
       - name: Test
         run: pnpm test
