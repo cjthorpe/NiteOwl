@@ -23,6 +23,7 @@ export type {
   OauthToken,
   PasswordResetToken,
   PersonalAccessToken,
+  Plan,
   RefreshToken,
   SlackAlertConfig,
   User,

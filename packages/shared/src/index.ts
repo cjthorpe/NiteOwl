@@ -11,6 +11,17 @@ export {
   timingSafeCompare,
 } from './crypto';
 
+export type { EntitledAccount, FeatureKey, PlanTier } from './entitlements';
+export {
+  capabilitiesFor,
+  DEFAULT_PLAN_TIER,
+  hasFeature,
+  isPlanTier,
+  PLAN_CAPABILITIES,
+  PLAN_TIERS,
+  resolvePlanTier,
+} from './entitlements';
+
 export function ok<T>(data: T): ApiResponse<T> {
   return { success: true, data, error: null };
 }
