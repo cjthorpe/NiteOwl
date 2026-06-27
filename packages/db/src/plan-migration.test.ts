@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Entitlements primitive — the single source of truth for what each commercial
  * plan tier can do. Consumed by BOTH API route guards and web UI gating, so it

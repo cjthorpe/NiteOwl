@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /** SHA-256 hex digest — used to store refresh token fingerprint in DB */

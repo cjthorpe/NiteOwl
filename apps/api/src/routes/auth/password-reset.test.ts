@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Integration tests for the password-reset routes — use Fastify inject so no
  * real HTTP server or Postgres is needed. DB calls are intercepted via a

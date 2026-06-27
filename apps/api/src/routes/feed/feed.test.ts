@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Integration tests for GET /api/feed and GET /api/integrations.
  * Uses Fastify inject + mock DB + mock Redis — no real network connections.

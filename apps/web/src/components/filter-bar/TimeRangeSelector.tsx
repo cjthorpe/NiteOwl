@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useId } from 'react';
 import { ALL_TIME_RANGES, TIME_RANGE_LABELS, type TimeRange } from '../../types/filters';
 

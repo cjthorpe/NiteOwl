@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { Link, useLocation } from 'react-router-dom';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useState } from 'react';
 import { ActivityFeed } from '../components/activity-feed/ActivityFeed';
 import { MorningBriefing } from '../components/morning-briefing/MorningBriefing';

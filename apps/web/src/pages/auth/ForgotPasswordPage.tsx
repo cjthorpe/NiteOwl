@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthButton } from '../../components/auth/AuthButton';

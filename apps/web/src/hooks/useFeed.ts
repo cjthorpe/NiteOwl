@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { fetchFeedPage } from '../lib/feed';
 import type { ActivityProvider } from '@niteowl/types';

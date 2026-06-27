@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import '@testing-library/jest-dom';
 
 // Provide a real in-memory localStorage when the runtime stub is incomplete

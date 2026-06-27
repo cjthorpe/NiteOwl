@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useNavigate } from 'react-router-dom';
 import { IntegrationCard } from '../components/integration-card/IntegrationCard';
 import { ProgressStepper } from '../components/ui/ProgressStepper';

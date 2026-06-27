@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { fetchWithBackoff, fetchAllPages } from './github-catchup-route.js';

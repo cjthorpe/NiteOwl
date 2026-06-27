@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useState, useEffect } from 'react';
 import { getAccessToken, refreshAccessToken } from '../lib/auth';
 

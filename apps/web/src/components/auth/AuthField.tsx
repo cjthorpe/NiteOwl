@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { forwardRef } from 'react';
 import type { InputHTMLAttributes } from 'react';
 

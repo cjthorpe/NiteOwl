@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Integration tests for the Personal Access Token routes (FUL-91) and the
  * auth-plugin PAT branch. Uses Fastify inject + a chainable DB mock, so no real

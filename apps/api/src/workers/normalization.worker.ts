@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { Worker } from 'bullmq';
 import type { Queue } from 'bullmq';
 import type { Db } from '@niteowl/db';

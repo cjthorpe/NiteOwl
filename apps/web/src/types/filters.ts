@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 export type TimeRange = '8h' | '12h' | '24h' | 'custom';
 
 export type Integration = 'github' | 'linear' | 'jira' | 'slack';
