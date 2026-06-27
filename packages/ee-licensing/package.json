@@ -1,9 +1,10 @@
 {
-  "name": "@niteowl/shared",
+  "name": "@niteowl/ee-licensing",
   "version": "0.0.1",
-  "license": "Apache-2.0",
   "private": true,
   "type": "module",
+  "license": "LicenseRef-BUSL-1.1",
+  "description": "Enterprise Edition (commercial) licensing & entitlement skeleton. Source-available under BUSL-1.1, NOT part of the open-source core. See packages/ee-licensing/LICENSE and docs/open-core.md.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -12,6 +13,10 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --noEmit",
