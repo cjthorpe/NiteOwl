@@ -10,7 +10,7 @@ export function ErrorState({ onRetry }: ErrorStateProps) {
       <div className="feed-state-icon" aria-hidden="true">
         ⚠
       </div>
-      <p className="feed-state-title">Couldn't load your feed</p>
+      <p className="feed-state-title">Couldn&apos;t load your feed</p>
       <p className="feed-state-message">
         Something went wrong fetching your activity. Check your connection and try again.
       </p>

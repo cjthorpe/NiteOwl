@@ -12,11 +12,10 @@
  *   DELETE /api/agent-logins/:id        — remove a registered agent login
  */
 
-import { and, eq } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { and, eq } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { requireAuth } from '../../plugins/auth.js';
 

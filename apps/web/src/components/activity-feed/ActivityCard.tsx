@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Activity } from '@niteowl/types';
-import { ProviderLogo } from '../ui/ProviderLogo';
+
 import { formatTimestamp, toDatetimeAttr } from '../../lib/time';
+import { ProviderLogo } from '../ui/ProviderLogo';
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   pr_opened: 'PR opened',

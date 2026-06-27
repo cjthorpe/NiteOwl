@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+
 import {
   ALL_INTEGRATIONS,
   ALL_EVENT_TYPES,

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { Activity } from '@niteowl/types';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+
 import { ActivityCard } from './ActivityCard';
-import type { Activity } from '@niteowl/types';
 
 function makeActivity(overrides: Partial<Activity> = {}): Activity {
   return {

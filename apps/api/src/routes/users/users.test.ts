@@ -5,6 +5,7 @@
  * Covers: FUL-63 acceptance criteria.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { buildApp } from '../../app.js';
 import { signAccessToken } from '../../lib/jwt.js';
 

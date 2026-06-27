@@ -14,11 +14,10 @@
  * Security: only the SHA-256 fingerprint is stored; every query is scoped by
  * userId; mint/revoke are logged.
  */
-import { and, desc, eq, isNull } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { sha256 } from '../../lib/crypto.js';
 import { generatePatToken } from '../../lib/pat.js';

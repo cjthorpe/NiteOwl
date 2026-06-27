@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { and, eq, gt, isNull } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { and, eq, gt, isNull } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { generateOpaqueToken, sha256 } from '../../lib/crypto.js';
 import { appBaseUrl, buildPasswordResetEmail, sendEmail } from '../../lib/email.js';

@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { Navigate, Route, Routes } from 'react-router-dom';
+
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { DashboardLayout } from './components/layout/DashboardLayout';
-import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
-import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
-import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AgentSettings } from './pages/AgentSettings';
-import { TokenSettings } from './pages/TokenSettings';
 import { Dashboard } from './pages/Dashboard';
 import { Integrations } from './pages/Integrations';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
+import { TokenSettings } from './pages/TokenSettings';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 
 export default function App() {
   return (

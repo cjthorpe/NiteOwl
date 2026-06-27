@@ -14,14 +14,13 @@
  *   POST   /api/slack-alerts/:id/test — send a test Slack message
  */
 
+import type { Db } from '@niteowl/db';
+import { encrypt, decrypt, schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from '@niteowl/db';
-import { encrypt, decrypt, schema } from '@niteowl/db';
-
-import { requireAuth } from '../../plugins/auth.js';
 import { formatPrMergeAlert, sendSlackAlert } from '../../lib/slack-alert.js';
+import { requireAuth } from '../../plugins/auth.js';
 
 // ---------------------------------------------------------------------------
 // Request body types

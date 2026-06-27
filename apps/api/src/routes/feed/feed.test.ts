@@ -5,6 +5,7 @@
  * Uses Fastify inject + mock DB + mock Redis — no real network connections.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { buildApp } from '../../app.js';
 import { signAccessToken } from '../../lib/jwt.js';
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, expect, it } from 'vitest';
+
 import { isRepoAllowed, parseRepoAllowlist } from './repo-allowlist.js';
 
 // ---------------------------------------------------------------------------

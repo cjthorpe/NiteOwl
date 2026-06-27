@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { buildApp } from '../../app.js';
 import { sha256 } from '../../lib/crypto.js';
+import { sendEmail } from '../../lib/email.js';
 
 // ── Email transport mock ─────────────────────────────────────────────────────
 vi.mock('../../lib/email.js', () => ({
@@ -20,7 +21,6 @@ vi.mock('../../lib/email.js', () => ({
   })),
   appBaseUrl: () => 'http://localhost:5173',
 }));
-import { sendEmail } from '../../lib/email.js';
 
 // ── DB mock ──────────────────────────────────────────────────────────────────
 // Each test controls what select returns by reassigning `selectRows`.

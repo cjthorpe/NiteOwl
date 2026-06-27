@@ -41,7 +41,7 @@ export function isEntitled(context: EntitlementContext, feature: string): boolea
 }
 
 /** Edition discriminator for runtime branching in the commercial build. */
-export const EDITION = 'enterprise' as const;
+export const EDITION = 'enterprise';
 export type Edition = typeof EDITION;
 
 export type { LicenceKeyPair } from './signing';

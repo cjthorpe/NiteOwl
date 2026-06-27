@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { eq, and } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-import type { Queue } from 'bullmq';
 
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
 import type { NormalizationJobData } from '@niteowl/types';
+import type { Queue } from 'bullmq';
+import { eq, and } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { isRepoAllowed } from '../../lib/repo-allowlist.js';
 
@@ -219,7 +219,7 @@ export const githubWebhookRoutes: FastifyPluginAsync<GitHubWebhookOptions> = asy
 
         // ── 4. Resolve user + integration from sender.id ─────────────
         const sender = payload['sender'] as Record<string, unknown> | undefined;
-        const senderId = typeof sender?.['id'] === 'number' ? (sender['id'] as number) : undefined;
+        const senderId = typeof sender?.['id'] === 'number' ? sender['id'] : undefined;
 
         if (senderId === undefined) {
           request.log.warn({ deliveryId }, 'GitHub webhook missing sender.id — skipping');

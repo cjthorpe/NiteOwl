@@ -22,7 +22,7 @@ export interface EncryptedToken {
   iv: string;
 }
 
-const ALGORITHM = 'aes-256-gcm' as const;
+const ALGORITHM = 'aes-256-gcm';
 const IV_BYTES = 12; // 96-bit IV recommended for GCM
 const TAG_BYTES = 16; // 128-bit auth tag (GCM default)
 const KEY_HEX_LENGTH = 64; // 32 bytes × 2 hex chars each

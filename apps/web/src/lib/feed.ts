@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Activity, ActivityProvider } from '@niteowl/types';
+
 import type { EventType } from '../types/filters';
+
 import { authedFetch } from './auth';
 
 /**
@@ -16,8 +18,7 @@ const EVENT_TYPE_DB_MAP: Record<EventType, string[]> = {
   comments: ['comment_created'],
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 export interface FeedParams {
   hours: number;

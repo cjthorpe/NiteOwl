@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useState, useEffect } from 'react';
+
 import { getAccessToken, refreshAccessToken } from '../lib/auth';
 
 /**
@@ -40,7 +41,7 @@ export function useAuth(): { isAuthenticated: boolean; isLoading: boolean } {
     // No token, or it has expired / is expiring — attempt a silent refresh via
     // the HttpOnly cookie.  This re-establishes the session after a page reload
     // or when the 1-hour access token has expired.
-    refreshAccessToken().then((token) => {
+    void refreshAccessToken().then((token) => {
       setIsAuthenticated(!!token);
       setIsLoading(false);
     });

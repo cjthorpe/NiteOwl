@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
-
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
 import { requireAuth } from '../../plugins/auth.js';
 
@@ -258,7 +257,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
               typeof meta?.['repo'] === 'string'
                 ? meta['repo'].toLowerCase()
                 : typeof meta?.['repository'] === 'string'
-                  ? (meta['repository'] as string).toLowerCase()
+                  ? meta['repository'].toLowerCase()
                   : null;
             return repoName?.includes(repo) ?? false;
           })

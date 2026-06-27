@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { Db } from '@niteowl/db';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
-
-import type { Db } from '@niteowl/db';
 
 import { verifyToken, type TokenPayload } from '../lib/jwt.js';
 import { isPatToken, verifyPatToken } from '../lib/pat.js';

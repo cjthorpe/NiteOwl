@@ -6,6 +6,7 @@
  * vi.mock so every code-path in the route handlers is exercised.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { buildApp } from '../../app.js';
 
 // ── DB mock ────────────────────────────────────────────────────────────────

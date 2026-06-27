@@ -11,8 +11,9 @@
  * Renders nothing when the provider has no persisted integration (not connected).
  */
 
-import { useEffect, useMemo, useState } from 'react';
 import type { ActivityProvider } from '@niteowl/types';
+import { useEffect, useMemo, useState } from 'react';
+
 import { useRepoAllowlist } from '../../hooks/useRepoAllowlist';
 import {
   allowlistsEqual,
@@ -46,7 +47,12 @@ export function RepoAllowlistControl({ provider = 'github' }: RepoAllowlistContr
   const [saveError, setSaveError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
 
-  const serverAllowlist = integration?.repoAllowlist ?? [];
+  // Memoised so its identity is stable across renders — otherwise the `dirty`
+  // useMemo below would recompute on every render (react-hooks/exhaustive-deps).
+  const serverAllowlist = useMemo(
+    () => integration?.repoAllowlist ?? [],
+    [integration?.repoAllowlist],
+  );
 
   useEffect(() => {
     setEntries(normalizeAllowlist(serverAllowlist));

@@ -4,9 +4,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FilterBar } from './FilterBar';
+
 import type { FilterState } from '../../types/filters';
 import { DEFAULT_FILTERS } from '../../types/filters';
+
+import { FilterBar } from './FilterBar';
 
 const defaultProps = {
   filters: DEFAULT_FILTERS,

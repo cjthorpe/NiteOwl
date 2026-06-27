@@ -11,9 +11,9 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "turbo lint && pnpm run lint:boundaries",
+    "lint": "turbo build && eslint . --ext .ts,.tsx,.js,.cjs,.mjs --max-warnings 0 && pnpm run lint:boundaries",
     "lint:boundaries": "eslint --no-eslintrc --no-inline-config -c eslint.boundaries.cjs --ext .ts,.tsx apps packages",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.cjs,.mjs --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "typecheck": "turbo typecheck",

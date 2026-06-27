@@ -9,7 +9,7 @@
  *  - Stubbing the BullMQ Worker constructor so no Redis connection is opened.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Stub BullMQ Worker so no Redis is required

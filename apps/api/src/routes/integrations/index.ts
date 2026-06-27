@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 import { eq, and } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
-
+import { parseRepoAllowlist } from '../../lib/repo-allowlist.js';
 import { requireAuth } from '../../plugins/auth.js';
+
 import { githubCatchupRoutes } from './github-catchup-route.js';
 import { linearCatchupRoutes } from './linear-catchup.js';
-import { parseRepoAllowlist } from '../../lib/repo-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -182,8 +182,8 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify
   // parent's `prefix` ('/api/integrations'), and Fastify applies a `prefix`
   // option additively. Re-passing it would mount these routes at
   // '/api/integrations/api/integrations/...' and 404 the documented paths (FUL-75).
-  fastify.register(linearCatchupRoutes, { db });
+  void fastify.register(linearCatchupRoutes, { db });
 
   // ── GitHub-specific routes (catchup) ─────────────────────────────────────
-  fastify.register(githubCatchupRoutes, { db });
+  void fastify.register(githubCatchupRoutes, { db });
 };

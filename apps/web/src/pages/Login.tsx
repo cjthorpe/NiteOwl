@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { Link, useLocation } from 'react-router-dom';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 interface LoginLocationState {
   /** Success notice handed over by the reset-password flow on completion. */

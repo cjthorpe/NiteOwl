@@ -41,7 +41,7 @@ import { DEFAULT_PLAN_TIER, isPlanTier, type PlanTier } from './entitlements';
  * `v` differs resolves to `unsupported_version` (→ free), reserving room for a
  * future format migration without silently honouring a shape we don't grok.
  */
-export const LICENCE_FORMAT_VERSION = 1 as const;
+export const LICENCE_FORMAT_VERSION = 1;
 
 /** The number of `.`-separated segments in a well-formed licence key. */
 const EXPECTED_SEGMENT_COUNT = 2;

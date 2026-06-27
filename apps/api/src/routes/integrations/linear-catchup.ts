@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { Db } from '@niteowl/db';
+import { schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
-
-import { requireAuth } from '../../plugins/auth.js';
 import { runLinearCatchup } from '../../lib/linear-catchup.js';
+import { requireAuth } from '../../plugins/auth.js';
 
 // ---------------------------------------------------------------------------
 // Route plugin

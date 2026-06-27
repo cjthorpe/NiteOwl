@@ -11,8 +11,9 @@
  * (e.g. not connected yet) so the caller can hide the control.
  */
 
-import { useState, useEffect, useCallback } from 'react';
 import type { ActivityProvider } from '@niteowl/types';
+import { useState, useEffect, useCallback } from 'react';
+
 import {
   fetchIntegrations,
   updateRepoAllowlist,

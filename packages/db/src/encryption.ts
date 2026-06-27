@@ -16,7 +16,7 @@
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
-const ALGORITHM = 'aes-256-gcm' as const;
+const ALGORITHM = 'aes-256-gcm';
 const IV_BYTES = 12; // 96-bit IV recommended for GCM
 const TAG_BYTES = 16; // 128-bit auth tag
 

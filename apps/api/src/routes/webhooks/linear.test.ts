@@ -9,9 +9,13 @@
  *  - normalizeLinearEvent — Comment.create events
  */
 import { createHmac } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import Redis from 'ioredis';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { buildApp } from '../../app.js';
+import { normalizeLinearEvent } from '../../normalizers/linear.js';
+
 import { verifyLinearSignature } from './linear.js';
 
 // ---------------------------------------------------------------------------
@@ -321,8 +325,6 @@ describe('POST /api/webhooks/linear', () => {
 // ---------------------------------------------------------------------------
 // Normalizer tests — Comment.create (via normalizeLinearEvent)
 // ---------------------------------------------------------------------------
-
-import { normalizeLinearEvent } from '../../normalizers/linear.js';
 
 describe('normalizeLinearEvent — Comment.create', () => {
   const USER_ID = 'user-abc-123';

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { signAccessToken, signRefreshToken, verifyToken } from './jwt.js';
 
 beforeEach(() => {

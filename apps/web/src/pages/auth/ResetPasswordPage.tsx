@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+
 import { AuthButton } from '../../components/auth/AuthButton';
 import { AuthField } from '../../components/auth/AuthField';
 import { AuthShell } from '../../components/auth/AuthShell';
@@ -138,7 +139,7 @@ export function ResetPasswordPage() {
       }
     >
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => void handleSubmit(e)}
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}
       >

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { ActivityProvider } from '@niteowl/types';
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { ActivityProvider } from '@niteowl/types';
 
 export type TimeHours = 8 | 12 | 24;
 

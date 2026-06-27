@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useNavigate } from 'react-router-dom';
+
 import { IntegrationCard } from '../components/integration-card/IntegrationCard';
 import { ProgressStepper } from '../components/ui/ProgressStepper';
 import { ProviderLogo } from '../components/ui/ProviderLogo';
@@ -8,7 +9,6 @@ import { useIntegrations } from '../hooks/useIntegrations';
 import {
   buildOAuthStartUrl,
   getIntegration,
-  INTEGRATIONS,
   OPTIONAL_PROVIDERS,
   PRIMARY_PROVIDER,
 } from '../lib/integrations';

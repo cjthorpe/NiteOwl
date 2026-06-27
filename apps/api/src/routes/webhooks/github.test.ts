@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { createHmac } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
-import { extractRepoFullName, verifyGitHubSignature } from './github.js';
+
 import { isRepoAllowed } from '../../lib/repo-allowlist.js';
+
+import { extractRepoFullName, verifyGitHubSignature } from './github.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

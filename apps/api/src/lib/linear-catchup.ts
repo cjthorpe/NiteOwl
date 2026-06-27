@@ -9,9 +9,9 @@
  *  - overnight-catchup BullMQ repeating job  (FUL-60)
  */
 
-import { eq } from 'drizzle-orm';
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
+import { eq } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
 // Linear GraphQL types (minimal)

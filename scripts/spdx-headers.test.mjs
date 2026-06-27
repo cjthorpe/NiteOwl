@@ -5,8 +5,8 @@
 // runner (`node --test`) so the SPDX CI job needs only Node — no pnpm install,
 // no test framework — keeping the header check fast and dependency-light.
 
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 
 import { expectedIdentifier, readSpdx, insertHeader } from './spdx-headers.mjs';
 

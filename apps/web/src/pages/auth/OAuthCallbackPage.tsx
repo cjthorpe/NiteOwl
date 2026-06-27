@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { ActivityProvider } from '@niteowl/types';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { ActivityProvider } from '@niteowl/types';
-import { useIntegrations } from '../../hooks/useIntegrations';
+
 import { ProviderLogo } from '../../components/ui/ProviderLogo';
-import { getIntegration } from '../../lib/integrations';
+import { useIntegrations } from '../../hooks/useIntegrations';
 import { refreshAccessToken } from '../../lib/auth';
+import { getIntegration } from '../../lib/integrations';
 
 type CallbackStatus = 'loading' | 'success' | 'error';
 
@@ -55,7 +56,7 @@ export function OAuthCallbackPage() {
       // Exchange the HttpOnly refresh cookie (set by the API callback) for a
       // short-lived JWT access token.  This is required for all protected API
       // calls; without it every request gets a 401.
-      refreshAccessToken().then((token) => {
+      void refreshAccessToken().then((token) => {
         if (!token) {
           setErrorMessage('Session could not be established. Please try again.');
           setCallbackStatus('error');

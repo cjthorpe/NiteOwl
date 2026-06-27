@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { useQuery } from '@tanstack/react-query';
-import { fetchBriefingItems } from '../lib/feed';
 import type { Activity } from '@niteowl/types';
+import { useQuery } from '@tanstack/react-query';
+
+import { fetchBriefingItems } from '../lib/feed';
 
 export interface AgentGroup {
   login: string;
