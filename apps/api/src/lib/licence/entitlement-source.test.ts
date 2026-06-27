@@ -44,10 +44,7 @@ function envWith(licenceKey?: string, publicKey?: string): NodeJS.ProcessEnv {
 
 describe('resolveDeploymentPlan', () => {
   it('resolves a valid enterprise licence to enterprise', () => {
-    const key = sign(
-      { v: LICENCE_FORMAT_VERSION, plan: 'enterprise', exp: FUTURE },
-      privateKey,
-    );
+    const key = sign({ v: LICENCE_FORMAT_VERSION, plan: 'enterprise', exp: FUTURE }, privateKey);
     expect(resolveDeploymentPlan(envWith(key, publicKeyPem))).toBe('enterprise');
   });
 

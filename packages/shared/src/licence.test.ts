@@ -116,10 +116,9 @@ describe('verifyLicence — fail-closed to free', () => {
     const key = signLicenceForTest(validPayload('pro'), privateKey);
     const [encodedPayload, sig] = key.split('.') as [string, string];
     // Re-encode a payload that claims enterprise, keep the pro signature.
-    const forged = Buffer.from(
-      JSON.stringify(validPayload('enterprise')),
-      'utf8',
-    ).toString('base64url');
+    const forged = Buffer.from(JSON.stringify(validPayload('enterprise')), 'utf8').toString(
+      'base64url',
+    );
     expect(forged).not.toBe(encodedPayload);
     const tampered = `${forged}.${sig}`;
     const result = verifyLicence(tampered, { publicKey: publicKeyPem, now: NOW });
