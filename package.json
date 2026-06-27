@@ -2,6 +2,7 @@
   "name": "niteowl",
   "private": true,
   "version": "0.0.1",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@11.6.0",
   "engines": {
     "node": ">=22.13.0",
@@ -10,7 +11,8 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "turbo lint",
+    "lint": "turbo lint && pnpm run lint:boundaries",
+    "lint:boundaries": "eslint --no-eslintrc --no-inline-config -c eslint.boundaries.cjs --ext .ts,.tsx apps packages",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",

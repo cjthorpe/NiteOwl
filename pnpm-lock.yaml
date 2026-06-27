@@ -191,6 +191,19 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  packages/ee-licensing:
+    dependencies:
+      '@niteowl/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@22.19.21)(jsdom@24.1.3)
+
   packages/shared:
     dependencies:
       '@niteowl/types':

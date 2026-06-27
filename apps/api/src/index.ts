@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { runMigrations } from '@niteowl/db';
 import { buildApp } from './app.js';
 import { missingEmailConfig } from './lib/email.js';

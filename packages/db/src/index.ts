@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { drizzle } from 'drizzle-orm/postgres-js';
