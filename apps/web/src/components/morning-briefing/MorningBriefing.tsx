@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import './morning-briefing.css';
 import { useMorningBriefing } from '../../hooks/useMorningBriefing';
 import { SummaryBar } from './SummaryBar';

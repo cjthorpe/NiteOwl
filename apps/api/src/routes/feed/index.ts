@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 

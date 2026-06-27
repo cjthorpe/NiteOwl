@@ -83,3 +83,27 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  # Lightweight, install-free guard: every source file must carry the correct
+  # SPDX header for its tier (Apache-2.0 for core, LicenseRef-BUSL-1.1 for
+  # ee-*). Runs on plain Node — no pnpm install — so it stays fast and is
+  # independent of the build matrix. See docs/open-core.md.
+  spdx:
+    name: spdx
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check SPDX headers
+        run: node scripts/spdx-headers.mjs --check
+
+      - name: Test SPDX header script
+        run: node --test scripts/spdx-headers.test.mjs

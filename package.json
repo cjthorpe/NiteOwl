@@ -18,6 +18,9 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yaml,yml}\"",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
+    "spdx:check": "node scripts/spdx-headers.mjs --check",
+    "spdx:write": "node scripts/spdx-headers.mjs --write",
+    "spdx:test": "node --test scripts/spdx-headers.test.mjs",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate"
   },

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * API client for Personal Access Tokens (FUL-93), backed by the PAT endpoints
  * from FUL-91. Uses `authedFetch` so calls self-heal on a stale access token.

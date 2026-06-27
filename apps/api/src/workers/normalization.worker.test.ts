@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Unit tests for extractAuthorLogin — the function that surfaces actor identity
  * from activity metadata so it can be stored in author_login and used for feed

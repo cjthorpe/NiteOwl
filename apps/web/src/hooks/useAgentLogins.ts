@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * useAgentLogins — CRUD for the /api/agent-logins registry (FUL-59)
  *

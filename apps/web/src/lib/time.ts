@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Format a timestamp relative to now (< 24h) or as an absolute date (>= 24h).
  */

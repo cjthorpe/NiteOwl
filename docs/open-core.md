@@ -82,10 +82,21 @@ Rules:
   location; but a `LicenseRef-BUSL-1.1` file outside `packages/ee-*` (or vice
   versa) is a mistake and should be moved, not relabelled.
 
-> Note: SPDX headers are currently applied to new files and to each core
-> package's entry point as the canonical exemplar. Backfilling headers across
-> all pre-existing core source is a mechanical follow-up and does not change the
-> boundary semantics.
+SPDX headers are applied across **every** source file, not just package entry
+points ([FUL-112](/FUL/issues/FUL-112)). The convention is enforced by a script
+that derives the expected identifier purely from a file's path:
+
+```bash
+pnpm spdx:check   # CI guard — fails on any file missing or with a wrong header
+pnpm spdx:write   # backfill: insert the header into any file that lacks one
+```
+
+`spdx:write` only ever **inserts** a missing header; it never relabels an
+existing one, because (per the rule above) a mismatched identifier signals a
+misplaced file that should be moved, not relabelled — so the script surfaces it
+as an error for a human to resolve. The check runs as its own lightweight,
+install-free `spdx` job in CI (plain Node, no `pnpm install`); see
+[`scripts/spdx-headers.mjs`](../scripts/spdx-headers.mjs).
 
 ## Enforcement
 

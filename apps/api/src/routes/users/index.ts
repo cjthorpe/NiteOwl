@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { FastifyPluginAsync } from 'fastify';
 import { requireAuth } from '../../plugins/auth.js';
 

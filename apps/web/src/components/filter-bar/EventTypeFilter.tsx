@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { ALL_EVENT_TYPES, EVENT_TYPE_LABELS, type EventType } from '../../types/filters';
 
 interface EventTypeFilterProps {

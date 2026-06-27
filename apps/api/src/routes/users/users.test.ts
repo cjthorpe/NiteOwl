@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Unit tests for GET /api/users/me and the ?since=last_login feed integration.
  * Covers: FUL-63 acceptance criteria.

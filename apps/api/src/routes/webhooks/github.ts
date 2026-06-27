@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { eq, and } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { IntegrationCard } from '../components/integration-card/IntegrationCard';
 import { RepoAllowlistControl } from '../components/integration-card/RepoAllowlistControl';
 import { useIntegrations } from '../hooks/useIntegrations';

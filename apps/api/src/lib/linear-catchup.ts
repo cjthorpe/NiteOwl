@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Core Linear catch-up logic — fetches issues completed in the last N hours
  * and inserts any missing ones into activity_events.

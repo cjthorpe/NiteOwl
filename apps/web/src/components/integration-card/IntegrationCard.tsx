@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { buildOAuthStartUrl, type IntegrationMeta } from '../../lib/integrations';
 import { ProviderLogo } from '../ui/ProviderLogo';
