@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 // Shared runtime utilities for the NiteOwl monorepo.
 // Domain types live in @niteowl/types.
 import type { ApiResponse } from '@niteowl/types';
@@ -10,6 +12,17 @@ export {
   serializeEncryptedToken,
   timingSafeCompare,
 } from './crypto';
+
+export type { EntitledAccount, FeatureKey, PlanTier } from './entitlements';
+export {
+  capabilitiesFor,
+  DEFAULT_PLAN_TIER,
+  hasFeature,
+  isPlanTier,
+  PLAN_CAPABILITIES,
+  PLAN_TIERS,
+  resolvePlanTier,
+} from './entitlements';
 
 export function ok<T>(data: T): ApiResponse<T> {
   return { success: true, data, error: null };

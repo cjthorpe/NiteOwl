@@ -16,6 +16,22 @@ import {
 
 export const providerEnum = pgEnum('provider', ['github', 'linear', 'jira', 'slack']);
 
+/**
+ * Commercial plan tier attached to an account (the `users` row in this
+ * single-tenant model). `free` is the open-source default; `pro` and
+ * `enterprise` are additive commercial overlays.
+ *
+ * These values are the persisted source of truth and MUST stay in sync with
+ * the `PlanTier` union in `@niteowl/shared` (src/entitlements.ts), which maps
+ * each tier to its capability set. The `hasFeature()` helper there treats a
+ * missing/unknown tier as `free`, so the free capability set is always the
+ * default path.
+ */
+export const planEnum = pgEnum('plan', ['free', 'pro', 'enterprise']);
+
+/** Persisted plan tier — see `planEnum`. */
+export type Plan = (typeof planEnum.enumValues)[number];
+
 // ---------------------------------------------------------------------------
 // users
 // ---------------------------------------------------------------------------
@@ -29,6 +45,12 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   /** GitHub numeric user ID — null until GitHub OAuth is connected */
   githubId: text('github_id').unique(),
+  /**
+   * Commercial plan tier for this account. Defaults to `free` — the
+   * open-source capability set — so an account with no explicit upgrade always
+   * resolves to free behaviour via `hasFeature()` in `@niteowl/shared`.
+   */
+  plan: planEnum('plan').notNull().default('free'),
   /**
    * Timestamp of the most recent session start. Snapshotted into the JWT at
    * login so the feed can compute a "since last login" window that stays stable

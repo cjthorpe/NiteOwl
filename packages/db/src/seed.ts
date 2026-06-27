@@ -61,10 +61,11 @@ async function seed(): Promise<void> {
   // ------------------------------------------------------------------
   // Users
   // ------------------------------------------------------------------
-  const seedUsers = [
-    { email: 'alice@example.com', displayName: 'Alice' },
-    { email: 'bob@example.com', displayName: 'Bob' },
-    { email: 'carol@example.com', displayName: 'Carol' },
+  // One account per tier so local dev exercises free/pro/enterprise gating.
+  const seedUsers: schema.NewUser[] = [
+    { email: 'alice@example.com', displayName: 'Alice', plan: 'enterprise' },
+    { email: 'bob@example.com', displayName: 'Bob', plan: 'pro' },
+    { email: 'carol@example.com', displayName: 'Carol', plan: 'free' },
   ];
 
   const insertedUsers = await db
