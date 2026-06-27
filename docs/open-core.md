@@ -117,13 +117,50 @@ This is a _standalone_ ESLint config (`--no-eslintrc -c`) on purpose: the main
 which the boundary check does not need. Keeping it separate makes the guard fast
 and dependency-light.
 
-### Recommended belt-and-braces (follow-up)
+### Build-without-commercial guard (the load-bearing check)
 
-The strongest possible guarantee is a CI job that **builds the free edition with
-the `ee-*` packages physically absent** — if core needs them, the build breaks.
-The ESLint guard catches the violation at author time; the
-build-without-commercial check catches anything the linter can't see (dynamic
-imports, config references). Tracked as a follow-up to this issue.
+The ESLint guard above catches `@niteowl/ee-*` imports at author time, but it
+cannot see everything: a dynamic `import()`, a `package.json` dependency, or a
+config-level reference can still tie core to commercial code without tripping a
+static import rule. The strongest possible guarantee is therefore a CI job that
+**builds the free edition with the `ee-*` packages physically absent** — if core
+needs them, the build breaks.
+
+This guard is the **`free` leg of the build matrix** in
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml). CI builds both
+editions from the same commit:
+
+- **`commercial`** — `ee-*` present; installs with `pnpm install --frozen-lockfile`.
+- **`free`** — `ee-*` removed; installs with `pnpm install --no-frozen-lockfile`.
+
+Before installing, the `free` leg runs
+[`scripts/ci/exclude-ee.sh`](../scripts/ci/exclude-ee.sh), which deletes every
+`packages/ee-*` directory from the working tree. It then installs, lints,
+type-checks, **builds**, and tests with the commercial code gone. If any core
+package or app depends on `@niteowl/ee-*` — via a `package.json` dependency, a
+static import, or a dynamic one — the `free` leg fails at resolution, type-check,
+or build. That red `CI / free` check is exactly the signal we want: the free
+product silently grew a dependency on paid code.
+
+Two notes on the mechanics:
+
+- Removing workspace packages invalidates the committed lockfile, so the `free`
+  install is intentionally `--no-frozen-lockfile` (re-resolution is expected);
+  the `commercial` install stays `--frozen-lockfile` so the real lockfile is
+  still verified.
+- The matrix uses `fail-fast: false` so both editions always run and you can see
+  exactly which one regressed.
+
+To reproduce locally:
+
+```bash
+./scripts/ci/exclude-ee.sh        # deletes packages/ee-* from your working tree
+pnpm install --no-frozen-lockfile
+pnpm build                        # must succeed with commercial code absent
+```
+
+> Heads-up: `exclude-ee.sh` is destructive — it `rm -rf`s `packages/ee-*`. Run
+> it from a throwaway checkout/worktree, or `git restore` afterwards.
 
 ## The open-core line — what belongs where
 
