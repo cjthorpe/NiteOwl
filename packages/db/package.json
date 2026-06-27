@@ -16,6 +16,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
     "db:seed": "tsx src/seed.ts",
@@ -29,6 +30,7 @@
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.30.0",
     "tsx": "^4.22.4",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^3.2.6"
   }
 }
