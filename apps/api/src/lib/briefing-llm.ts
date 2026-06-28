@@ -91,9 +91,7 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
  * `enabled` requires BOTH the flag to be truthy AND a non-empty API key, so an
  * operator can never half-enable the feature into a guaranteed-fail state.
  */
-export function resolveBriefingLlmConfig(
-  env: NodeJS.ProcessEnv = process.env,
-): BriefingLlmConfig {
+export function resolveBriefingLlmConfig(env: NodeJS.ProcessEnv = process.env): BriefingLlmConfig {
   const apiKey = (env['ANTHROPIC_API_KEY'] ?? '').trim();
   const flag = parseBool(env['BRIEFING_LLM_ENABLED']);
   return {
@@ -107,7 +105,7 @@ export function resolveBriefingLlmConfig(
 }
 
 const SYSTEM_PROMPT = [
-  'You rewrite a software team\'s morning activity digest into warm, natural,',
+  "You rewrite a software team's morning activity digest into warm, natural,",
   'skimmable English for an engineering manager. You are given the raw activity',
   'summary and a deterministic baseline digest.',
   '',

@@ -29,7 +29,16 @@ describe('briefing-digest web re-export', () => {
       ...empty,
       totalItems: 3,
       summary: { ...empty.summary, totalPrsOpened: 2 },
-      agentGroups: [{ login: 'alice', items: [], prsOpened: 2, prsMerged: 0, issuesClosed: 0, commitsPushed: 0 }],
+      agentGroups: [
+        {
+          login: 'alice',
+          items: [],
+          prsOpened: 2,
+          prsMerged: 0,
+          issuesClosed: 0,
+          commitsPushed: 0,
+        },
+      ],
     });
     expect(active.headline).toContain('3 updates');
     expect(active.highlights[0]?.kind).toBe('needs_review');

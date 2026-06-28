@@ -31,14 +31,14 @@ payload shape is identical.
 
 ## Configuration (server-only)
 
-| Env var | Default | Purpose |
-|---|---|---|
-| `BRIEFING_LLM_ENABLED` | `false` | Master flag. Must be truthy **and** a key present to enable. |
-| `ANTHROPIC_API_KEY` | — | Server secret. **Never** sent to the browser. |
-| `BRIEFING_LLM_MODEL` | `claude-haiku-4-5-20251001` | Small, fast Claude model. Override per the `claude-api` skill; pin a snapshot in production. |
-| `BRIEFING_LLM_TIMEOUT_MS` | `4000` | Hard request timeout (AbortController). On timeout → heuristic. |
-| `BRIEFING_LLM_MAX_TOKENS` | `512` | Output cap; the digest is short. |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Override for proxies/gateways. |
+| Env var                   | Default                     | Purpose                                                                                      |
+| ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
+| `BRIEFING_LLM_ENABLED`    | `false`                     | Master flag. Must be truthy **and** a key present to enable.                                 |
+| `ANTHROPIC_API_KEY`       | —                           | Server secret. **Never** sent to the browser.                                                |
+| `BRIEFING_LLM_MODEL`      | `claude-haiku-4-5-20251001` | Small, fast Claude model. Override per the `claude-api` skill; pin a snapshot in production. |
+| `BRIEFING_LLM_TIMEOUT_MS` | `4000`                      | Hard request timeout (AbortController). On timeout → heuristic.                              |
+| `BRIEFING_LLM_MAX_TOKENS` | `512`                       | Output cap; the digest is short.                                                             |
+| `ANTHROPIC_BASE_URL`      | `https://api.anthropic.com` | Override for proxies/gateways.                                                               |
 
 Enabling requires **both** `BRIEFING_LLM_ENABLED` truthy **and** a non-empty
 `ANTHROPIC_API_KEY`, so the feature can never be half-enabled into a

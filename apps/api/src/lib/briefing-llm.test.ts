@@ -3,7 +3,6 @@
 import type { BriefingDigestInput } from '@niteowl/shared/briefing-digest';
 import { describe, expect, it, vi } from 'vitest';
 
-
 import {
   enhanceBriefingWithLlm,
   resolveBriefingLlmConfig,
@@ -208,9 +207,7 @@ describe('enhanceBriefingWithLlm — success path', () => {
   it('extracts JSON even when wrapped in markdown fences', async () => {
     const result = await enhanceBriefingWithLlm(INPUT, {
       config: ENABLED,
-      fetchImpl: okFetchReturning(
-        '```json\n{"headline":"Wrapped.","highlights":[]}\n```',
-      ),
+      fetchImpl: okFetchReturning('```json\n{"headline":"Wrapped.","highlights":[]}\n```'),
     });
     expect(result?.headline).toBe('Wrapped.');
   });
