@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import type { ActivityEventType, ActivityProvider } from '@niteowl/types';
 import type { BriefingDigestInput, DigestAgentGroup } from '@niteowl/shared/briefing-digest';
+import type { ActivityEventType, ActivityProvider } from '@niteowl/types';
 
 /**
  * Server-side construction of the structured {@link BriefingDigestInput}.

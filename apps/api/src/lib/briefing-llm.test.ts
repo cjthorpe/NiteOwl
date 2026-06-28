@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
+import type { BriefingDigestInput } from '@niteowl/shared/briefing-digest';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { BriefingDigestInput } from '@niteowl/shared/briefing-digest';
 
 import {
   enhanceBriefingWithLlm,

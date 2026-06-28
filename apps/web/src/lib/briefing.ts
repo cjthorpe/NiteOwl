@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import type { BriefingDigest, BriefingHighlight } from './briefing-digest';
 import { authedFetch } from './auth';
+import type { BriefingDigest, BriefingHighlight } from './briefing-digest';
 
 /**
  * Client for the optional server-side briefing digest (FUL-136).
@@ -13,8 +13,7 @@ import { authedFetch } from './auth';
  * visible regression when the LLM (or the endpoint) is unavailable.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_URL = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 /** The server adds a `source` discriminator to the heuristic shape. */
 export interface ServerBriefingDigest extends BriefingDigest {
@@ -40,7 +39,7 @@ function parseDigest(body: unknown): ServerBriefingDigest | null {
   const source = record['source'] === 'llm' ? 'llm' : 'heuristic';
   return {
     headline: record['headline'],
-    highlights: record['highlights'] as BriefingHighlight[],
+    highlights: record['highlights'],
     source,
   };
 }

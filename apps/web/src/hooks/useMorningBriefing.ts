@@ -3,8 +3,8 @@
 import type { Activity } from '@niteowl/types';
 import { useQuery } from '@tanstack/react-query';
 
-import { buildBriefingDigest, type BriefingDigest } from '../lib/briefing-digest';
 import { fetchServerBriefingDigest } from '../lib/briefing';
+import { buildBriefingDigest, type BriefingDigest } from '../lib/briefing-digest';
 import { fetchBriefingItems } from '../lib/feed';
 
 export interface AgentGroup {

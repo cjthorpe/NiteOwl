@@ -4,6 +4,7 @@
  * test env, so every response exercises the guaranteed heuristic fallback.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { buildApp } from '../../app.js';
 import { signAccessToken } from '../../lib/jwt.js';
 

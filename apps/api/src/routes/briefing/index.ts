@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
-import { and, desc, eq, gte } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
 
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
 import { buildBriefingDigest } from '@niteowl/shared/briefing-digest';
+import { and, desc, eq, gte } from 'drizzle-orm';
+import type { FastifyPluginAsync } from 'fastify';
 
-import { requireAuth } from '../../plugins/auth.js';
 import { buildBriefingDigestInput, type BriefingActivityRow } from '../../lib/briefing-input.js';
 import { enhanceBriefingWithLlm, resolveBriefingLlmConfig } from '../../lib/briefing-llm.js';
+import { requireAuth } from '../../plugins/auth.js';
 
 const DEFAULT_HOURS = 8;
 const MAX_HOURS = 72;
