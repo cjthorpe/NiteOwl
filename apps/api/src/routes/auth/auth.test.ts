@@ -330,3 +330,131 @@ describe('POST /auth/refresh — replay detection (nuclear option)', () => {
     expect(cookieStr).toMatch(/niteowl_refresh/);
   });
 });
+
+// ── Tests: CSRF Origin/Referer hardening on cookie-auth routes (FUL-134) ────
+// The `niteowl_refresh` cookie's SameSite=Strict is the primary CSRF control;
+// `originCheck` is layered defense-in-depth. These lock the behaviour in.
+describe('CSRF origin check on /auth/* mutations', () => {
+  const ALLOWED = 'https://app.niteowl.test';
+
+  beforeEach(() => {
+    // Pin the allowlist deterministically regardless of ambient env.
+    process.env['CORS_ORIGIN'] = ALLOWED;
+    delete process.env['WEB_URL'];
+  });
+
+  it('rejects POST /auth/refresh from a forbidden Origin with 403', async () => {
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/refresh',
+      headers: { origin: 'https://evil.example' },
+      cookies: { niteowl_refresh: 'whatever' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    const body = res.json<{ success: boolean; error: string }>();
+    expect(body.success).toBe(false);
+    expect(body.error).toMatch(/origin not allowed/i);
+    // The handler must not have run — no DB lookup happened.
+    expect(mockDb.select).not.toHaveBeenCalled();
+  });
+
+  it('rejects POST /auth/logout from a forbidden Origin without deleting tokens', async () => {
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { origin: 'https://evil.example' },
+      cookies: { niteowl_refresh: 'victim-token' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    // Forged logout must not revoke the victim's session.
+    expect(mockDb.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects POST /auth/login from a forbidden Origin (login-CSRF) with 403', async () => {
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: { origin: 'https://evil.example' },
+      payload: { email: 'victim@example.com', password: 'irrelevant' },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('rejects POST /auth/register from a forbidden Origin with 403', async () => {
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      headers: { origin: 'https://evil.example' },
+      payload: { email: 'victim@example.com', password: 'hunter2hunter2' },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('allows an allowlisted Origin through the check (login proceeds to 401)', async () => {
+    selectRows = []; // unknown user → handler returns 401, proving check passed
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: { origin: ALLOWED },
+      payload: { email: 'ghost@example.com', password: 'irrelevant' },
+    });
+
+    // Not 403: the Origin was accepted and the route handler ran.
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('allows a request with no Origin/Referer (non-browser client policy)', async () => {
+    selectRows = [];
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'ghost@example.com', password: 'irrelevant' },
+    });
+
+    // Header-less request is allowed by policy; handler runs → 401 for unknown user.
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('falls back to Referer when Origin is absent — forbidden Referer is rejected', async () => {
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/refresh',
+      headers: { referer: 'https://evil.example/login' },
+      cookies: { niteowl_refresh: 'whatever' },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+});
+
+// ── Invariant: /api/* mutations are Bearer-only and reject cookie-only auth ──
+// This locks the core assumption of the FUL-119 threat model: `/api/*` never
+// authenticates from a cookie, so it is CSRF-immune by construction. If a
+// future change wired cookie auth into the API surface, this test breaks.
+describe('Invariant: /api/* mutations do not accept cookie auth', () => {
+  it('POST /api/agent-logins returns 401 when only a refresh cookie is sent (no Bearer)', async () => {
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/agent-logins',
+      // A valid-looking session cookie but NO Authorization header.
+      cookies: { niteowl_refresh: 'a-real-looking-session-cookie' },
+      payload: { integration: 'github', login: 'some-bot' },
+    });
+
+    expect(res.statusCode).toBe(401);
+    // The cookie must not have authenticated the request into the handler.
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+});
