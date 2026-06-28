@@ -3,6 +3,7 @@
 import type { Activity } from '@niteowl/types';
 import { useQuery } from '@tanstack/react-query';
 
+import { buildBriefingDigest, type BriefingDigest } from '../lib/briefing-digest';
 import { fetchBriefingItems } from '../lib/feed';
 
 export interface AgentGroup {
@@ -27,6 +28,8 @@ export interface MorningBriefingData {
   agentGroups: AgentGroup[];
   summary: BriefingSummary;
   totalItems: number;
+  /** Heuristic "what changed and why it matters" digest (FUL-122). */
+  digest: BriefingDigest;
 }
 
 function groupByAgent(items: Activity[]): AgentGroup[] {
@@ -79,7 +82,9 @@ export function useMorningBriefing() {
       const items = await fetchBriefingItems({ since: 'last_login' });
       const agentGroups = groupByAgent(items);
       const summary = computeSummary(agentGroups);
-      return { agentGroups, summary, totalItems: items.length };
+      const totalItems = items.length;
+      const digest = buildBriefingDigest({ agentGroups, summary, totalItems });
+      return { agentGroups, summary, totalItems, digest };
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
