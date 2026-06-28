@@ -118,3 +118,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` / `deve
 4. **Docker Build Check** — validates both Dockerfiles build to the `builder` stage
 
 The **deploy workflow** (`.github/workflows/deploy.yml`) triggers on pushes to `main`, builds production Docker images, pushes them to GHCR, and deploys both services to Railway. Requires `RAILWAY_TOKEN` secret.
+
+## Releases
+
+NiteOwl ships a tagged release **every two weeks**. See
+[`docs/release-process.md`](docs/release-process.md) for the cadence, versioning,
+core-vs-commercial notes structure, and the cut-a-release runbook. Draft notes
+are generated with [`scripts/release/gen-notes.sh`](scripts/release/gen-notes.sh).
