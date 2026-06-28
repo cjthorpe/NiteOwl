@@ -99,7 +99,15 @@ export const integrations = pgTable('integrations', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   provider: providerEnum('provider').notNull(),
-  /** AES-256-GCM encrypted JSON config; decrypted at application layer */
+  /**
+   * Plaintext JSON of non-secret, per-integration routing metadata
+   * (e.g. githubLogin, repoAllowlist, Linear organizationId/organizationName,
+   * Jira siteUrl). NOT encrypted: these fields are queried server-side via
+   * Postgres JSON operators for webhook routing (e.g. config_json->>'siteUrl'),
+   * which an opaque ciphertext would break. Never store credentials or secrets
+   * here — OAuth tokens and webhook URLs belong in their dedicated
+   * *_encrypted columns.
+   */
   configJson: jsonb('config_json'),
   enabled: boolean('enabled').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
