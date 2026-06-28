@@ -39,6 +39,74 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Digest — narrative "what changed and why it matters" (FUL-122) */
+.briefing-digest {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-6);
+  position: relative;
+  overflow: hidden;
+}
+
+.briefing-digest::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--color-accent), oklch(68% 0.18 145));
+}
+
+.briefing-digest-headline {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
+.briefing-digest-highlights {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.briefing-digest-highlight {
+  position: relative;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.briefing-digest-highlight::before {
+  content: '';
+  position: absolute;
+  left: var(--space-1);
+  top: 0.5em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-text-subtle);
+}
+
+.briefing-digest-highlight[data-emphasis='true'] {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.briefing-digest-highlight[data-emphasis='true']::before {
+  background: var(--color-danger);
+}
+
+.briefing-digest-highlight[data-kind='merged']::before {
+  background: oklch(68% 0.18 145);
+}
+
 /* Summary bar */
 .briefing-summary-bar {
   display: grid;

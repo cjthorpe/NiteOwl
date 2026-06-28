@@ -4,6 +4,7 @@ import './morning-briefing.css';
 import { useMorningBriefing } from '../../hooks/useMorningBriefing';
 
 import { AgentGroupCard } from './AgentGroupCard';
+import { BriefingDigest } from './BriefingDigest';
 import { SummaryBar } from './SummaryBar';
 
 function BriefingSkeleton() {
@@ -68,6 +69,8 @@ export function MorningBriefing() {
 
   return (
     <div aria-label="Morning briefing" role="region">
+      <BriefingDigest digest={data.digest} />
+
       <SummaryBar summary={data.summary} />
 
       <div className="briefing-agent-list" aria-label="Activity by agent">
