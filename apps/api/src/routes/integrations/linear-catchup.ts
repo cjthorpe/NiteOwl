@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
+import { decryptToken, schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
@@ -71,7 +71,7 @@ export const linearCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
           db,
           userId,
           integrationId: integration.id,
-          accessToken: tokenRow.accessTokenEncrypted,
+          accessToken: decryptToken(tokenRow.accessTokenEncrypted),
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'fetch_failed';

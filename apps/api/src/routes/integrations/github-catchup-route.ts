@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
+import { decryptToken, schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
@@ -88,7 +88,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
         db,
         userId,
         integrationId: row.integrationId,
-        accessToken: row.accessToken,
+        accessToken: decryptToken(row.accessToken),
         since,
         until,
         config: row.configJson as { repoAllowlist?: unknown } | null,
@@ -214,7 +214,7 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
           db,
           userId,
           integrationId: integration.id,
-          accessToken: tokenRow.accessTokenEncrypted,
+          accessToken: decryptToken(tokenRow.accessTokenEncrypted),
           since: sinceDate,
           until: untilDate,
           config: integration.configJson as { repoAllowlist?: unknown } | null,

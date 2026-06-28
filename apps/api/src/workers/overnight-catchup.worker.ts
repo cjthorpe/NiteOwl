@@ -25,7 +25,7 @@
  */
 
 import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
+import { decryptToken, schema } from '@niteowl/db';
 import { Worker } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 
@@ -99,7 +99,7 @@ export function createOvernightCatchupWorker(
             db,
             userId: row.userId,
             integrationId: row.integrationId,
-            accessToken: row.accessToken,
+            accessToken: decryptToken(row.accessToken),
           });
           totalIngested += result.ingested;
           console.info(
@@ -154,7 +154,7 @@ export function createOvernightCatchupWorker(
             db,
             userId: row.userId,
             integrationId: row.integrationId,
-            accessToken: row.accessToken,
+            accessToken: decryptToken(row.accessToken),
             since,
             until,
             config: row.configJson as { repoAllowlist?: unknown } | null,

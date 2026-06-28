@@ -21,7 +21,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
     "db:seed": "tsx src/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:backfill:oauth-encryption": "tsx src/backfill-oauth-encryption.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

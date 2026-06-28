@@ -97,3 +97,51 @@ export function decryptOptional(value: string | null | undefined): string | null
   if (value == null) return null;
   return decrypt(value);
 }
+
+/**
+ * True if `value` has the wire shape produced by {@link encrypt} —
+ * three "."-separated base64url segments whose iv/tag decode to the expected
+ * byte lengths (`<iv>.<ciphertext>.<authTag>`).
+ *
+ * Used to distinguish real ciphertext from legacy plaintext during the
+ * FUL-135 plaintext→ciphertext migration of OAuth tokens. Raw OAuth tokens
+ * (GitHub `gho_…`, Linear `lin_oauth_…`) never contain "." so they are
+ * unambiguously classified as plaintext.
+ */
+export function isEncrypted(value: string): boolean {
+  const parts = value.split('.');
+  if (parts.length !== 3) return false;
+  const [ivB64, , tagB64] = parts as [string, string, string];
+  try {
+    return (
+      Buffer.from(ivB64, 'base64url').length === IV_BYTES &&
+      Buffer.from(tagB64, 'base64url').length === TAG_BYTES
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Decrypt a token value, tolerating legacy plaintext rows.
+ *
+ * OAuth tokens were historically persisted in plaintext despite the
+ * `*_encrypted` column names (FUL-135). During and after the backfill
+ * migration, read paths may still encounter un-encrypted values; this helper
+ * returns those untouched so live integrations keep working, while genuinely
+ * encrypted values are decrypted and integrity-checked. A value that *looks*
+ * encrypted but fails its GCM auth tag still throws — tampering is never
+ * silently ignored.
+ */
+export function decryptToken(value: string): string {
+  return isEncrypted(value) ? decrypt(value) : value;
+}
+
+/**
+ * Nullable variant of {@link decryptToken} for optional columns
+ * (e.g. `refresh_token_encrypted`).
+ */
+export function decryptTokenOptional(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  return decryptToken(value);
+}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
+import { encrypt, schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
@@ -245,7 +245,9 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           integrationId = created.id;
         }
 
-        // Upsert OAuth token (raw token stored; encrypt at app layer in prod)
+        // Upsert OAuth token. The access token is AES-256-GCM encrypted at the
+        // app layer (FUL-135) before it ever reaches the DB; read paths decrypt.
+        const accessTokenEncrypted = encrypt(ghToken);
         const [existingToken] = await db
           .select({ id: schema.oauthTokens.id })
           .from(schema.oauthTokens)
@@ -258,7 +260,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           await db
             .update(schema.oauthTokens)
             .set({
-              accessTokenEncrypted: ghToken,
+              accessTokenEncrypted,
               scopes: GITHUB_OAUTH_SCOPE,
               updatedAt: new Date(),
             })
@@ -267,7 +269,7 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           await db.insert(schema.oauthTokens).values({
             userId,
             provider: 'github',
-            accessTokenEncrypted: ghToken,
+            accessTokenEncrypted,
             scopes: GITHUB_OAUTH_SCOPE,
           });
         }
