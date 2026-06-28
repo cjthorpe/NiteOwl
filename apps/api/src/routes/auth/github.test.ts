@@ -14,6 +14,7 @@
  * Uses Fastify inject + a chainable DB mock so no HTTP server or Postgres is
  * needed. `fetch` is stubbed and routed by URL.
  */
+import { decrypt, isEncrypted } from '@niteowl/db';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { buildApp } from '../../app.js';
@@ -62,6 +63,7 @@ beforeEach(() => {
   process.env['COOKIE_SECRET'] = 'test-cookie-secret-32-chars-long!!';
   process.env['GITHUB_CLIENT_ID'] = 'gh-client-id';
   process.env['GITHUB_CLIENT_SECRET'] = 'gh-client-secret';
+  process.env['DB_ENCRYPTION_KEY'] = 'a'.repeat(64);
   selectRows = [];
   setCalls.length = 0;
 
@@ -138,6 +140,14 @@ describe('GET /auth/github/callback (post-login backfill)', () => {
     // not the stale `user:email`.
     const scopeWrite = setCalls.find((c) => 'scopes' in c);
     expect(scopeWrite?.['scopes']).toBe('user:email,public_repo');
+
+    // FUL-135: the access token must be persisted as AES-256-GCM ciphertext,
+    // never the raw GitHub token. It must still round-trip back to the original.
+    const stored = scopeWrite?.['accessTokenEncrypted'] as string;
+    expect(stored).toBeDefined();
+    expect(stored).not.toBe('gh-access-token');
+    expect(isEncrypted(stored)).toBe(true);
+    expect(decrypt(stored)).toBe('gh-access-token');
 
     // The background backfill is fire-and-forget — let its first fetch resolve.
     await vi.waitFor(() => {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Db } from '@niteowl/db';
-import { schema } from '@niteowl/db';
+import { encrypt, schema } from '@niteowl/db';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
@@ -233,9 +233,9 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           });
         }
 
-        // Upsert OAuth token record.
-        // NOTE: accessTokenEncrypted stores the raw token here.
-        // In production this should be AES-256-GCM encrypted at the app layer.
+        // Upsert OAuth token record. The access token is AES-256-GCM encrypted
+        // at the app layer (FUL-135) before it is persisted; reads decrypt it.
+        const accessTokenEncrypted = encrypt(tokenData.access_token);
         const tokenExpiresAt =
           tokenData.expires_in != null ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
 
@@ -251,7 +251,7 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           await db
             .update(schema.oauthTokens)
             .set({
-              accessTokenEncrypted: tokenData.access_token,
+              accessTokenEncrypted,
               scopes: tokenData.scope,
               ...(tokenExpiresAt != null ? { expiresAt: tokenExpiresAt } : {}),
               updatedAt: new Date(),
@@ -261,7 +261,7 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           await db.insert(schema.oauthTokens).values({
             userId,
             provider: 'linear',
-            accessTokenEncrypted: tokenData.access_token,
+            accessTokenEncrypted,
             scopes: tokenData.scope,
             ...(tokenExpiresAt != null ? { expiresAt: tokenExpiresAt } : {}),
           });
