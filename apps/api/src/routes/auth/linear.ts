@@ -6,6 +6,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
 import { generateOAuthState, sha256, timingSafeCompare } from '../../lib/crypto.js';
+import { originCheck } from '../../lib/origin-check.js';
 
 import { REFRESH_COOKIE } from './constants.js';
 
@@ -87,9 +88,15 @@ export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
   const redirectUri = `${apiUrl}/auth/linear/callback`;
 
   // ── GET /auth/linear ── Initiate Linear OAuth ─────────────────────────────
+  // This init path falls back to the `niteowl_refresh` cookie to resolve the
+  // user (lines below), so it is a cookie-auth surface despite being a GET.
+  // originCheck rejects foreign Origin/Referer; same-site navigations from our
+  // SPA carry an allowlisted Referer and a top-level direct navigation carries
+  // neither header (allowed by policy) — and SameSite=Strict would withhold the
+  // refresh cookie cross-site anyway (FUL-134).
   fastify.get(
     '/linear',
-    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, preHandler: originCheck() },
     async (request, reply) => {
       const clientId = process.env['LINEAR_CLIENT_ID'];
       const webRoot = process.env['WEB_URL'] ?? 'http://localhost:5173';

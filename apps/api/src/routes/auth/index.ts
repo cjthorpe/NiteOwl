@@ -7,6 +7,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { sha256 } from '../../lib/crypto.js';
 import { signAccessToken, signRefreshToken } from '../../lib/jwt.js';
+import { originCheck } from '../../lib/origin-check.js';
 
 import { REFRESH_COOKIE } from './constants.js';
 import { emailAuthRoutes } from './email.js';
@@ -34,8 +35,12 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
   void fastify.register(tokenRoutes, { ...opts, prefix: '' });
 
   // ── POST /auth/refresh ────────────────────────────────────────────────────
+  // Cookie-authenticated (reads `niteowl_refresh`) → CSRF-sensitive. The
+  // SameSite=Strict cookie is the primary control; originCheck is layered
+  // defense-in-depth (FUL-134).
   fastify.post('/refresh', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    preHandler: originCheck(),
     handler: async (request, reply) => {
       const rawToken = request.cookies[REFRESH_COOKIE];
       if (!rawToken) {
@@ -141,8 +146,11 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
   });
 
   // ── POST /auth/logout ─────────────────────────────────────────────────────
+  // Cookie-authenticated (reads `niteowl_refresh`) → CSRF-sensitive: a forged
+  // logout is a denial-of-service nuisance. originCheck blocks foreign origins.
   fastify.post('/logout', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    preHandler: originCheck(),
     handler: async (request, reply) => {
       const rawToken = request.cookies[REFRESH_COOKIE];
 

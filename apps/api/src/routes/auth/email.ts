@@ -7,6 +7,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { sha256 } from '../../lib/crypto.js';
 import { signAccessToken, signRefreshToken } from '../../lib/jwt.js';
+import { originCheck } from '../../lib/origin-check.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 
 import { REFRESH_COOKIE } from './constants.js';
@@ -23,8 +24,15 @@ interface LoginBody {
 }
 
 export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
+  // /register and /login set the `niteowl_refresh` cookie. They are not
+  // cookie-*authenticated*, so classic CSRF does not apply, but a forged
+  // cross-origin submission (login-CSRF) could log a victim into an
+  // attacker-controlled account. A full anti-CSRF token is out of scope for the
+  // core MVP (see docs/security-csrf.md); the Origin allowlist is the
+  // proportionate control and rejects foreign-origin submissions (FUL-134).
   fastify.post<{ Body: RegisterBody }>('/register', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    preHandler: originCheck(),
     schema: {
       body: {
         type: 'object',
@@ -93,6 +101,7 @@ export const emailAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, {
 
   fastify.post<{ Body: LoginBody }>('/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    preHandler: originCheck(),
     schema: {
       body: {
         type: 'object',
