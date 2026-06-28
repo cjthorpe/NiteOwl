@@ -4,6 +4,7 @@ import type { Activity } from '@niteowl/types';
 import { useQuery } from '@tanstack/react-query';
 
 import { buildBriefingDigest, type BriefingDigest } from '../lib/briefing-digest';
+import { fetchServerBriefingDigest } from '../lib/briefing';
 import { fetchBriefingItems } from '../lib/feed';
 
 export interface AgentGroup {
@@ -28,8 +29,14 @@ export interface MorningBriefingData {
   agentGroups: AgentGroup[];
   summary: BriefingSummary;
   totalItems: number;
-  /** Heuristic "what changed and why it matters" digest (FUL-122). */
+  /**
+   * "What changed and why it matters" digest. Prefers the server digest (which
+   * may be an LLM rewrite, FUL-136) and falls back to the local heuristic
+   * (FUL-122) whenever the endpoint or LLM is unavailable.
+   */
   digest: BriefingDigest;
+  /** Which path produced {@link digest}: the server ('llm'/'heuristic') or local fallback. */
+  digestSource: 'llm' | 'heuristic' | 'local';
 }
 
 function groupByAgent(items: Activity[]): AgentGroup[] {
@@ -79,12 +86,25 @@ export function useMorningBriefing() {
   return useQuery({
     queryKey: ['morning-briefing'],
     queryFn: async (): Promise<MorningBriefingData> => {
-      const items = await fetchBriefingItems({ since: 'last_login' });
+      // Fetch the feed (needed for the grouped UI) and the optional server digest
+      // in parallel — the server computes its own window, so there's no waterfall.
+      const [items, serverDigest] = await Promise.all([
+        fetchBriefingItems({ since: 'last_login' }),
+        fetchServerBriefingDigest(),
+      ]);
       const agentGroups = groupByAgent(items);
       const summary = computeSummary(agentGroups);
       const totalItems = items.length;
-      const digest = buildBriefingDigest({ agentGroups, summary, totalItems });
-      return { agentGroups, summary, totalItems, digest };
+
+      // Prefer the server digest; fall back to the local heuristic so the digest
+      // always renders even when the endpoint or LLM is unavailable.
+      const localDigest = buildBriefingDigest({ agentGroups, summary, totalItems });
+      const digest: BriefingDigest = serverDigest
+        ? { headline: serverDigest.headline, highlights: serverDigest.highlights }
+        : localDigest;
+      const digestSource = serverDigest ? serverDigest.source : 'local';
+
+      return { agentGroups, summary, totalItems, digest, digestSource };
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,

@@ -12,6 +12,7 @@ import queuePlugin from './plugins/queue.js';
 import redisPlugin from './plugins/redis.js';
 import { agentLoginRoutes } from './routes/agent-logins/index.js';
 import { authRoutes } from './routes/auth/index.js';
+import { briefingRoutes } from './routes/briefing/index.js';
 import { feedRoutes } from './routes/feed/index.js';
 import { integrationsRoutes } from './routes/integrations/index.js';
 import { slackAlertRoutes } from './routes/slack-alerts/index.js';
@@ -125,6 +126,9 @@ export function buildApp(opts: BuildAppOptions = {}) {
   // Feed + integrations API
   void app.register(feedRoutes, { prefix: '/api/feed', db });
   void app.register(integrationsRoutes, { prefix: '/api/integrations', db });
+
+  // Morning-briefing digest (heuristic + optional server-side LLM enhancement)
+  void app.register(briefingRoutes, { prefix: '/api/briefing', db });
 
   // Webhook receivers — no auth, secured by provider-specific signatures.
   // GitHub handler is registered inside app.after() so the queue decoration
