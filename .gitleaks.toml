@@ -1,0 +1,19 @@
+# NiteOwl gitleaks configuration
+# Extends the built-in gitleaks ruleset and adds project-specific allowlisting.
+# Run locally: gitleaks detect --no-banner --redact --config .gitleaks.toml
+title = "NiteOwl gitleaks config"
+
+[extend]
+# Inherit gitleaks' default rules (AWS keys, GitHub tokens, private keys, etc.).
+useDefault = true
+
+[allowlist]
+description = "Allowlist placeholder/example values and generated files"
+paths = [
+  # Documented placeholder env values, not real secrets.
+  '''\.env\.example$''',
+  # Generated lockfile contains integrity hashes, not credentials.
+  '''pnpm-lock\.yaml$''',
+  # This config file itself.
+  '''(.*?)\.gitleaks\.toml$''',
+]
