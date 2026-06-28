@@ -45,7 +45,7 @@ jobs:
       # ── API image ──────────────────────────────────────────────────────────
       - name: Docker meta — API
         id: meta-api
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api
           tags: |
@@ -66,7 +66,7 @@ jobs:
       # ── Web image ──────────────────────────────────────────────────────────
       - name: Docker meta — Web
         id: meta-web
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web
           tags: |
