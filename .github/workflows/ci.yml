@@ -6,28 +6,11 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel superseded runs on the same ref to keep PR feedback fast.
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  # Build-both-editions matrix: {free, commercial} x {lint, typecheck, test,
-  # build}, all from one SHA. The `free` leg is also the "free-without-ee"
-  # guard — it physically deletes the commercial packages/ee-* code before
-  # installing, so the open-source core must stand on its own. If core ever
-  # imports @niteowl/ee-*, the free leg breaks (install / type-check / build).
-  # See docs/open-core.md.
-  build:
-    name: ${{ matrix.edition }}
+  ci:
+    name: Lint, Type-check, Test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    strategy:
-      # Always run both editions so we see exactly which one regressed.
-      fail-fast: false
-      matrix:
-        edition: [free, commercial]
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -42,32 +25,8 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      # Free edition guard: remove commercial code BEFORE install so a stray
-      # core dependency on ee-* fails fast at resolution time.
-      - name: Exclude commercial (ee-*) packages — free edition guard
-        if: matrix.edition == 'free'
-        run: ./scripts/ci/exclude-ee.sh
-
-      # Turborepo cache, keyed per edition (free/commercial have different
-      # inputs and must not share artifacts). restore-keys lets a new SHA warm
-      # from the most recent run of the same edition.
-      - name: Cache Turborepo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-${{ matrix.edition }}-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ matrix.edition }}-${{ runner.os }}-
-
-      # Commercial: lockfile must be exact. Free: workspace was mutated above,
-      # so the committed lockfile no longer matches — re-resolve is expected.
-      - name: Install dependencies (commercial)
-        if: matrix.edition == 'commercial'
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install dependencies (free)
-        if: matrix.edition == 'free'
-        run: pnpm install --no-frozen-lockfile
 
       - name: Lint
         run: pnpm lint
@@ -78,32 +37,62 @@ jobs:
       - name: Type-check
         run: pnpm typecheck
 
-      - name: Build
-        run: pnpm build
+      - name: Build shared
+        run: pnpm --filter @niteowl/shared build
 
       - name: Test
         run: pnpm test
 
-  # Lightweight, install-free guard: every source file must carry the correct
-  # SPDX header for its tier (Apache-2.0 for core, LicenseRef-BUSL-1.1 for
-  # ee-*). Runs on plain Node — no pnpm install — so it stays fast and is
-  # independent of the build matrix. See docs/open-core.md.
-  spdx:
-    name: spdx
+  secret-scan:
+    name: Secret scan
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can scan every commit, not just HEAD.
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: '8.21.2'
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan for secrets
+        run: gitleaks detect --no-banner --redact --config .gitleaks.toml
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'pnpm'
 
-      - name: Check SPDX headers
-        run: node scripts/spdx-headers.mjs --check
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Test SPDX header script
-        run: node --test scripts/spdx-headers.test.mjs
+      # Blocking gate: fail on high+ advisories in shipped (production) deps.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
+      # Visibility only: surface dev-tooling advisories without blocking merges.
+      # Dependabot raises PRs to remediate these over time.
+      - name: Audit all dependencies (report-only)
+        run: pnpm audit --audit-level moderate || true

@@ -1,0 +1,30 @@
+version: 2
+
+updates:
+  # JavaScript/TypeScript dependencies (pnpm workspace, reads pnpm-lock.yaml).
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: 'chore'
+      include: scope
+    groups:
+      # Batch low-risk dev tooling bumps into a single PR to cut noise.
+      dev-dependencies:
+        dependency-type: development
+      # Keep production dependency bumps separate for closer review.
+      production-dependencies:
+        dependency-type: production
+
+  # GitHub Actions used in CI/CD workflows.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'ci'
