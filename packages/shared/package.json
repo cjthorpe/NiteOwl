@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./briefing-digest": {
+      "types": "./dist/briefing-digest.d.ts",
+      "import": "./dist/briefing-digest.js"
     }
   },
   "scripts": {

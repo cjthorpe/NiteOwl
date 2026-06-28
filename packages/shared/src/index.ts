@@ -4,6 +4,20 @@
 // Domain types live in @niteowl/types.
 import type { ApiResponse } from '@niteowl/types';
 
+// Briefing digest (FUL-122/FUL-136). Pure + node-free; also exposed via the
+// `@niteowl/shared/briefing-digest` subpath so the browser can import it without
+// pulling the `node:crypto`-backed modules re-exported below.
+export type {
+  BriefingDigest,
+  BriefingDigestInput,
+  BriefingHighlight,
+  BriefingHighlightKind,
+  DigestActivity,
+  DigestAgentGroup,
+  DigestSummary,
+} from './briefing-digest';
+export { buildBriefingDigest } from './briefing-digest';
+
 export type { EncryptedToken } from './crypto';
 export {
   decryptToken,
