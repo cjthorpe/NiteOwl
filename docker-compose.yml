@@ -91,8 +91,25 @@ services:
         - action: sync
           path: ./apps/web/src
           target: /app/apps/web/src
+        # The web bundle imports `@niteowl/shared/briefing-digest`, which resolves
+        # through the package `exports` map to its compiled `dist`. That `dist` is
+        # built once in the image (apps/web/Dockerfile dev stage). A plain `sync`
+        # of the source would NOT regenerate the dist, so a changed export (e.g.
+        # `resolveAuthorLogin`, FUL-139) would be missing from the stale dist and
+        # crash the app with "Indirectly exported binding name … not found" (blank
+        # screen). Rebuild the web image when the shared/types sources change so
+        # the dist is regenerated. Shared-lib edits are infrequent, so the rebuild
+        # cost is acceptable; this mirrors the existing package.json rebuild rules.
+        - action: rebuild
+          path: ./packages/shared/src
+        - action: rebuild
+          path: ./packages/types/src
         - action: rebuild
           path: apps/web/package.json
+        - action: rebuild
+          path: packages/shared/package.json
+        - action: rebuild
+          path: packages/types/package.json
 
 volumes:
   postgres_data:
