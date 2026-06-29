@@ -9,6 +9,13 @@ dist
 **/dist
 build
 **/build
+# TypeScript incremental build cache. Composite packages write a root-level
+# `tsconfig.tsbuildinfo` (outside `dist/`, so the rules above miss it). If a dirty
+# working tree's cache is COPYed into an image build, `tsc` treats declarations as
+# up-to-date and silently skips `.d.ts` emit — leaving consumers with TS7016
+# "Could not find a declaration file" (FUL-138). Keep image builds hermetic.
+*.tsbuildinfo
+**/*.tsbuildinfo
 coverage
 **/.nyc_output
 *.log
