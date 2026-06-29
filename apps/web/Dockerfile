@@ -15,7 +15,19 @@ FROM base AS dev
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /app/packages/types/node_modules ./packages/types/node_modules
 COPY . .
+# The web bundle imports the node-free `@niteowl/shared/briefing-digest` subpath
+# (FUL-122/FUL-136), which resolves through the package `exports` map to its
+# compiled `dist`. `dist` is gitignored and excluded by `.dockerignore`, so it is
+# absent on a fresh checkout — Vite then fails import-analysis with "Failed to
+# resolve import @niteowl/shared/briefing-digest" (FUL-138). Build the workspace
+# packages the bundle depends on before Vite starts (types first, since shared's
+# tsc build resolves `@niteowl/types` declarations). Mirrors the API dev stage
+# (FUL-96). The web `compose watch` only syncs `apps/web/src`, so `packages/shared`
+# does not change in this container and a one-time build is sufficient.
+RUN pnpm --filter "@niteowl/types" build && \
+    pnpm --filter "@niteowl/shared" build
 EXPOSE 5173
 CMD ["pnpm", "--filter", "@niteowl/web", "dev"]
 
