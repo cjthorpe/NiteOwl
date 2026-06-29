@@ -2,7 +2,12 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, expect, it } from 'vitest';
 
-import { buildBriefingDigest, type BriefingDigestInput } from './briefing-digest';
+import {
+  buildBriefingDigest,
+  resolveAuthorLogin,
+  UNKNOWN_AUTHOR_LOGIN,
+  type BriefingDigestInput,
+} from './briefing-digest';
 
 // The exhaustive behavioural suite lives next to the implementation in
 // `@niteowl/shared` (briefing-digest.test.ts). This smoke test only proves the
@@ -42,5 +47,11 @@ describe('briefing-digest web re-export', () => {
     });
     expect(active.headline).toContain('3 updates');
     expect(active.highlights[0]?.kind).toBe('needs_review');
+  });
+
+  it('re-exports the author resolver used by the grouping/avatar (FUL-139)', () => {
+    expect(resolveAuthorLogin(null, { author: 'ada' })).toBe('ada');
+    expect(resolveAuthorLogin(null, {})).toBeNull();
+    expect(UNKNOWN_AUTHOR_LOGIN).toBe('(unknown)');
   });
 });

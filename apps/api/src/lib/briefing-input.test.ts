@@ -8,8 +8,9 @@ function row(
   authorLogin: string | null,
   eventType: BriefingActivityRow['eventType'],
   provider: BriefingActivityRow['provider'] = 'github',
+  metadata?: Record<string, unknown> | null,
 ): BriefingActivityRow {
-  return { authorLogin, eventType, provider };
+  return { authorLogin, eventType, provider, metadata };
 }
 
 describe('buildBriefingDigestInput', () => {
@@ -72,5 +73,17 @@ describe('buildBriefingDigestInput', () => {
     expect(input.agentGroups).toHaveLength(1);
     expect(input.agentGroups[0]?.login).toBe('(unknown)');
     expect(input.agentGroups[0]?.items).toHaveLength(2);
+  });
+
+  it('recovers the actor name from metadata when author_login is null (FUL-139)', () => {
+    // Repo-scan rows leave `author_login` null but carry the name in metadata.
+    const input = buildBriefingDigestInput([
+      row(null, 'commit_pushed', 'github', { author: 'ada' }),
+      row(null, 'pr_merged', 'github', { author: 'ada' }),
+      row(null, 'pr_opened', 'github', { author: 'grace' }),
+    ]);
+    expect(input.agentGroups.find((g) => g.login === '(unknown)')).toBeUndefined();
+    expect(input.agentGroups.find((g) => g.login === 'ada')?.items).toHaveLength(2);
+    expect(input.agentGroups.find((g) => g.login === 'grace')?.prsOpened).toBe(1);
   });
 });

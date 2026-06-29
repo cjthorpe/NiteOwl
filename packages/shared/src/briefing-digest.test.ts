@@ -2,7 +2,12 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, expect, it } from 'vitest';
 
-import { buildBriefingDigest, type BriefingDigestInput } from './briefing-digest';
+import {
+  buildBriefingDigest,
+  resolveAuthorLogin,
+  UNKNOWN_AUTHOR_LOGIN,
+  type BriefingDigestInput,
+} from './briefing-digest';
 
 /** Minimal builder for the structural digest input used across these tests. */
 function input(overrides: Partial<BriefingDigestInput> = {}): BriefingDigestInput {
@@ -144,6 +149,50 @@ describe('buildBriefingDigest', () => {
     expect(providers?.text).toContain('Linear');
   });
 
+  it('omits attribution when the top contributor is the unknown sentinel (FUL-139)', () => {
+    const digest = buildBriefingDigest(
+      input({
+        totalItems: 5,
+        summary: {
+          totalPrsMerged: 4,
+          totalIssuesClosed: 0,
+          totalCommitsPushed: 0,
+          totalPrsOpened: 0,
+        },
+        agentGroups: [group(UNKNOWN_AUTHOR_LOGIN, { prsMerged: 4 })],
+      }),
+    );
+    const merged = digest.highlights.find((h) => h.kind === 'merged');
+    expect(merged?.text).toContain('4');
+    expect(merged?.text).not.toContain('led by');
+    expect(merged?.text).not.toContain('unknown');
+  });
+
+  it('does not surface the unknown bucket as the busiest top mover (FUL-139)', () => {
+    const digest = buildBriefingDigest(
+      input({
+        totalItems: 6,
+        agentGroups: [
+          group(UNKNOWN_AUTHOR_LOGIN, {
+            items: [
+              { provider: 'github', eventType: 'commit_pushed' },
+              { provider: 'github', eventType: 'commit_pushed' },
+              { provider: 'github', eventType: 'commit_pushed' },
+              { provider: 'github', eventType: 'commit_pushed' },
+            ],
+          }),
+          group('alice', {
+            items: [
+              { provider: 'github', eventType: 'commit_pushed' },
+              { provider: 'github', eventType: 'commit_pushed' },
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(digest.highlights.find((h) => h.kind === 'top_mover')).toBeUndefined();
+  });
+
   it('caps the number of highlights to keep the digest scannable', () => {
     const digest = buildBriefingDigest(
       input({
@@ -173,5 +222,37 @@ describe('buildBriefingDigest', () => {
     expect(digest.highlights.length).toBeLessThanOrEqual(5);
     // The actionable review highlight must never be dropped by the cap.
     expect(digest.highlights[0]?.kind).toBe('needs_review');
+  });
+});
+
+describe('resolveAuthorLogin', () => {
+  it('prefers a non-empty authorLogin column', () => {
+    expect(resolveAuthorLogin('octocat', { author: 'someone-else' })).toBe('octocat');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(resolveAuthorLogin('  octocat  ')).toBe('octocat');
+  });
+
+  it('falls back to metadata.author when the column is null (repo-scan rows, FUL-139)', () => {
+    expect(resolveAuthorLogin(null, { author: 'Ada Lovelace' })).toBe('Ada Lovelace');
+  });
+
+  it('honours the actor-field priority order', () => {
+    expect(resolveAuthorLogin(undefined, { pusher: 'p', sender: 's', author: 'a' })).toBe('a');
+    expect(resolveAuthorLogin(undefined, { pusher: 'p', sender: 's' })).toBe('s');
+    expect(resolveAuthorLogin(undefined, { pusher: 'p' })).toBe('p');
+  });
+
+  it('ignores blank and non-string candidates', () => {
+    expect(
+      resolveAuthorLogin('   ', { author: '   ', sender: 42 as unknown as string }),
+    ).toBeNull();
+  });
+
+  it('returns null when no actor is recoverable', () => {
+    expect(resolveAuthorLogin(null, {})).toBeNull();
+    expect(resolveAuthorLogin(null, null)).toBeNull();
+    expect(resolveAuthorLogin(undefined)).toBeNull();
   });
 });

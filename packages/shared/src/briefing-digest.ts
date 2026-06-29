@@ -74,6 +74,52 @@ export interface BriefingDigest {
 /** Maximum highlights shown so the digest stays scannable. */
 const MAX_HIGHLIGHTS = 5;
 
+/**
+ * Sentinel login used when an activity has no recoverable actor. Shared by the
+ * web grouping and the API digest input so the "unknown" bucket is identified
+ * consistently (and so the digest/UI can render a friendly label instead of the
+ * raw sentinel). FUL-139.
+ */
+export const UNKNOWN_AUTHOR_LOGIN = '(unknown)';
+
+/** Human-facing label rendered in place of {@link UNKNOWN_AUTHOR_LOGIN}. */
+export const UNKNOWN_AUTHOR_LABEL = 'an unknown contributor';
+
+/** Metadata fields that may carry the actor's login/display name, in priority order. */
+const AUTHOR_METADATA_FIELDS = ['author', 'sender', 'creator', 'reporter', 'pusher'] as const;
+
+/**
+ * Resolve the best display login for an activity.
+ *
+ * Prefers the dedicated `authorLogin` column (extracted at ingestion, FUL-58),
+ * then falls back to the normalised actor fields stashed in `metadata` — this is
+ * what recovers real contributor names for repo-scan rows whose `authorLogin`
+ * column was never populated (FUL-139). Returns `null` when no actor is present,
+ * leaving the caller to apply its own unknown sentinel/label.
+ */
+export function resolveAuthorLogin(
+  authorLogin: string | null | undefined,
+  metadata?: Record<string, unknown> | null,
+): string | null {
+  if (typeof authorLogin === 'string' && authorLogin.trim() !== '') {
+    return authorLogin.trim();
+  }
+  if (metadata) {
+    for (const field of AUTHOR_METADATA_FIELDS) {
+      const candidate = metadata[field];
+      if (typeof candidate === 'string' && candidate.trim() !== '') {
+        return candidate.trim();
+      }
+    }
+  }
+  return null;
+}
+
+/** Whether a resolved login is the unknown-actor sentinel (or absent). */
+function isUnknownLogin(login: string | null | undefined): boolean {
+  return !login || login === UNKNOWN_AUTHOR_LOGIN;
+}
+
 const PROVIDER_LABELS: Record<ActivityProvider, string> = {
   github: 'GitHub',
   linear: 'Linear',
@@ -149,7 +195,9 @@ export function buildBriefingDigest(data: BriefingDigestInput): BriefingDigest {
   if (summary.totalPrsOpened > 0) {
     const n = summary.totalPrsOpened;
     const topOpener = topBy(agentGroups, (g) => g.prsOpened);
-    const who = topOpener ? ` — ${topOpener.login} opened the most` : '';
+    // Only attribute when we have a real name — never "opened by (unknown)" (FUL-139).
+    const who =
+      topOpener && !isUnknownLogin(topOpener.login) ? ` — ${topOpener.login} opened the most` : '';
     highlights.push({
       kind: 'needs_review',
       emphasis: true,
@@ -161,16 +209,23 @@ export function buildBriefingDigest(data: BriefingDigestInput): BriefingDigest {
   if (summary.totalPrsMerged > 0) {
     const n = summary.totalPrsMerged;
     const topMerger = topBy(agentGroups, (g) => g.prsMerged);
-    const who = topMerger ? `, led by ${topMerger.login}` : '';
+    // Only name the merger when it's a real contributor — never "led by (unknown)" (FUL-139).
+    const who = topMerger && !isUnknownLogin(topMerger.login) ? `, led by ${topMerger.login}` : '';
     highlights.push({
       kind: 'merged',
       text: `${n} ${plural(n, 'pull request')} merged${who}.`,
     });
   }
 
-  // 3. Momentum: the busiest contributor (skip when it just restates the headline).
+  // 3. Momentum: the busiest contributor (skip when it just restates the headline,
+  //    or when the busiest bucket is the unknown-actor group — naming "(unknown)"
+  //    as the most active is noise, not signal, FUL-139).
   const busiest = topBy(agentGroups, (g) => g.items.length);
-  if (busiest && (agentGroups.length > 1 || busiest.items.length >= 3)) {
+  if (
+    busiest &&
+    !isUnknownLogin(busiest.login) &&
+    (agentGroups.length > 1 || busiest.items.length >= 3)
+  ) {
     const n = busiest.items.length;
     highlights.push({
       kind: 'top_mover',

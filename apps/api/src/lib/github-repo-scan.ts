@@ -212,6 +212,7 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
         const authorDate = commit.commit.author?.date;
         if (!authorDate) continue;
 
+        const author = commit.commit.author?.name ?? null;
         rows.push({
           userId,
           integrationId,
@@ -221,10 +222,14 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
           externalId: `commit:${commit.sha}`,
           title: `[${repoName}] ${commit.commit.message.split('\n')[0]}`,
           url: commit.html_url,
+          // Populate the indexed actor column so the briefing groups by real
+          // contributor (not "(unknown)") and the feed `?author=` filter works
+          // for repo-scan rows (FUL-139).
+          authorLogin: author,
           metadata: {
             sha: commit.sha,
             repo: repoName,
-            author: commit.commit.author?.name ?? null,
+            author,
             message: commit.commit.message,
           },
           occurredAt: new Date(authorDate),
@@ -254,6 +259,7 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
         const occurredAt =
           eventType === 'pr_merged' && pr.merged_at !== null ? new Date(pr.merged_at) : updatedAt;
 
+        const author = pr.user?.login ?? null;
         rows.push({
           userId,
           integrationId,
@@ -264,10 +270,12 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
           externalId: `pr:${pr.id}:catch-up`,
           title: `[${repoName}] PR #${pr.number}: ${pr.title}`,
           url: pr.html_url,
+          // Indexed actor column — see commit branch above (FUL-139).
+          authorLogin: author,
           metadata: {
             prNumber: pr.number,
             repo: repoName,
-            author: pr.user?.login ?? null,
+            author,
             state: pr.state,
             baseBranch: pr.base.ref,
           },

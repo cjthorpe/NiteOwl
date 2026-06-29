@@ -4,7 +4,12 @@ import type { Activity } from '@niteowl/types';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchServerBriefingDigest } from '../lib/briefing';
-import { buildBriefingDigest, type BriefingDigest } from '../lib/briefing-digest';
+import {
+  buildBriefingDigest,
+  resolveAuthorLogin,
+  UNKNOWN_AUTHOR_LOGIN,
+  type BriefingDigest,
+} from '../lib/briefing-digest';
 import { fetchBriefingItems } from '../lib/feed';
 
 export interface AgentGroup {
@@ -43,7 +48,9 @@ function groupByAgent(items: Activity[]): AgentGroup[] {
   const map = new Map<string, Activity[]>();
 
   for (const item of items) {
-    const login = item.authorLogin ?? '(unknown)';
+    // Recover the contributor name from the payload when the indexed column is
+    // empty (repo-scan rows leave author_login null but carry it in metadata, FUL-139).
+    const login = resolveAuthorLogin(item.authorLogin, item.metadata) ?? UNKNOWN_AUTHOR_LOGIN;
     const existing = map.get(login);
     if (existing) {
       existing.push(item);

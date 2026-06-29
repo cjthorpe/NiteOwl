@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { AgentGroup } from '../../hooks/useMorningBriefing';
+import { UNKNOWN_AUTHOR_LOGIN } from '../../lib/briefing-digest';
 import { formatTimestamp, toDatetimeAttr } from '../../lib/time';
+
+/** Standalone, title-case label for the unknown-actor bucket (FUL-139). */
+const UNKNOWN_DISPLAY_NAME = 'Unknown contributor';
 
 const EVENT_LABELS: Record<string, string> = {
   pr_opened: 'PR opened',
@@ -21,8 +25,20 @@ function extractRepo(metadata: Record<string, unknown>): string {
   return '';
 }
 
+function isUnknownLogin(login: string): boolean {
+  return login === UNKNOWN_AUTHOR_LOGIN;
+}
+
+/** First letter for the avatar; a neutral glyph for the unknown bucket (never "(", FUL-139). */
 function avatarInitial(login: string): string {
-  return login.charAt(0).toUpperCase();
+  if (isUnknownLogin(login)) return '?';
+  const initial = login.trim().charAt(0).toUpperCase();
+  return initial || '?';
+}
+
+/** Human-facing contributor name; the sentinel becomes a friendly label (FUL-139). */
+function displayName(login: string): string {
+  return isUnknownLogin(login) ? UNKNOWN_DISPLAY_NAME : login;
 }
 
 interface AgentGroupCardProps {
@@ -31,18 +47,19 @@ interface AgentGroupCardProps {
 
 export function AgentGroupCard({ group }: AgentGroupCardProps) {
   const unreviewedCount = group.unreviewedPrs.length;
+  const name = displayName(group.login);
 
   return (
-    <section className="agent-group" aria-label={`Activity for ${group.login}`}>
+    <section className="agent-group" aria-label={`Activity for ${name}`}>
       <header className="agent-group-header">
         <div className="agent-group-name">
           <div className="agent-group-avatar" aria-hidden="true">
             {avatarInitial(group.login)}
           </div>
-          <span>{group.login}</span>
+          <span>{name}</span>
         </div>
 
-        <div className="agent-group-chips" role="list" aria-label={`${group.login} stats`}>
+        <div className="agent-group-chips" role="list" aria-label={`${name} stats`}>
           {group.prsMerged > 0 && (
             <span
               className="agent-chip"
@@ -86,7 +103,7 @@ export function AgentGroupCard({ group }: AgentGroupCardProps) {
         </div>
       </header>
 
-      <ul className="agent-group-items" aria-label={`Events from ${group.login}`}>
+      <ul className="agent-group-items" aria-label={`Events from ${name}`}>
         {group.items.map((item) => {
           const isUnreviewed = item.eventType === 'pr_opened';
           const repo = extractRepo(item.metadata);
