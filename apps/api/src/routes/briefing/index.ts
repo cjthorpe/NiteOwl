@@ -63,6 +63,9 @@ export const briefingRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, op
           provider: schema.activityEvents.provider,
           eventType: schema.activityEvents.eventType,
           authorLogin: schema.activityEvents.authorLogin,
+          // Carried so the digest can recover the actor name from the payload when
+          // `author_login` was never populated (repo-scan rows, FUL-139).
+          metadata: schema.activityEvents.metadata,
         })
         .from(schema.activityEvents)
         .where(

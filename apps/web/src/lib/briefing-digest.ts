@@ -19,4 +19,9 @@ export type {
   DigestAgentGroup,
   DigestSummary,
 } from '@niteowl/shared/briefing-digest';
-export { buildBriefingDigest } from '@niteowl/shared/briefing-digest';
+export {
+  buildBriefingDigest,
+  resolveAuthorLogin,
+  UNKNOWN_AUTHOR_LABEL,
+  UNKNOWN_AUTHOR_LOGIN,
+} from '@niteowl/shared/briefing-digest';

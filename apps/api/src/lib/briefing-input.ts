@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { BriefingDigestInput, DigestAgentGroup } from '@niteowl/shared/briefing-digest';
+import { resolveAuthorLogin, UNKNOWN_AUTHOR_LOGIN } from '@niteowl/shared/briefing-digest';
 import type { ActivityEventType, ActivityProvider } from '@niteowl/types';
 
 /**
@@ -20,9 +21,12 @@ export interface BriefingActivityRow {
   provider: ActivityProvider;
   eventType: ActivityEventType;
   authorLogin: string | null;
+  /**
+   * Provider-specific payload. Used to recover the actor name for rows whose
+   * `authorLogin` column was never populated (e.g. repo-scan ingestion, FUL-139).
+   */
+  metadata?: Record<string, unknown> | null;
 }
-
-const UNKNOWN_LOGIN = '(unknown)';
 
 function countEvent(rows: ReadonlyArray<BriefingActivityRow>, type: ActivityEventType): number {
   return rows.reduce((acc, r) => (r.eventType === type ? acc + 1 : acc), 0);
@@ -37,7 +41,7 @@ export function buildBriefingDigestInput(
 ): BriefingDigestInput {
   const byLogin = new Map<string, BriefingActivityRow[]>();
   for (const row of rows) {
-    const login = row.authorLogin ?? UNKNOWN_LOGIN;
+    const login = resolveAuthorLogin(row.authorLogin, row.metadata) ?? UNKNOWN_AUTHOR_LOGIN;
     const existing = byLogin.get(login);
     if (existing) {
       existing.push(row);

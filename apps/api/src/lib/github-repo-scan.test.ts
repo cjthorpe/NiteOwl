@@ -123,6 +123,10 @@ describe('runGitHubRepoScan — multi-contributor ingestion', () => {
     const authors = captured.rows.map((r) => (r['metadata'] as { author: string }).author).sort();
     expect(authors).toEqual(['Claude', 'Paperclip', 'broken_algorithms']);
     expect(captured.rows.every((r) => r['eventType'] === 'commit_pushed')).toBe(true);
+    // author_login is populated so the briefing groups by real contributor and
+    // the feed `?author=` filter works for repo-scan rows (FUL-139).
+    const authorLogins = captured.rows.map((r) => r['authorLogin']).sort();
+    expect(authorLogins).toEqual(['Claude', 'Paperclip', 'broken_algorithms']);
   });
 
   it('ingests PRs by other contributors and classifies merged/open/closed', async () => {
