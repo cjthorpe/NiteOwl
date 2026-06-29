@@ -24,8 +24,10 @@ COPY . .
 # resolve import @niteowl/shared/briefing-digest" (FUL-138). Build the workspace
 # packages the bundle depends on before Vite starts (types first, since shared's
 # tsc build resolves `@niteowl/types` declarations). Mirrors the API dev stage
-# (FUL-96). The web `compose watch` only syncs `apps/web/src`, so `packages/shared`
-# does not change in this container and a one-time build is sufficient.
+# (FUL-96). This dist is rebuilt whenever `packages/shared/src` changes because the
+# web `compose watch` triggers an image rebuild on that path (FUL-139) — otherwise
+# a changed export would be missing from this one-time build and crash the app with
+# "Indirectly exported binding name … not found".
 RUN pnpm --filter "@niteowl/types" build && \
     pnpm --filter "@niteowl/shared" build
 EXPOSE 5173
