@@ -34,6 +34,7 @@ vi.mock('ioredis', () => {
 const mockDb = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
+  leftJoin: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   orderBy: vi.fn().mockReturnThis(),
   limit: vi.fn().mockResolvedValue([]),
@@ -43,6 +44,9 @@ const mockDb = {
   delete: vi.fn().mockReturnThis(),
   update: vi.fn().mockReturnThis(),
   set: vi.fn().mockReturnThis(),
+  // Set-based read-state mutations issue raw SQL via db.execute; the RETURNING
+  // rows it resolves to determine the reported marked/unmarked count.
+  execute: vi.fn().mockResolvedValue([]),
 };
 
 const USER_ID = 'b1234567-0000-0000-0000-000000000001';
@@ -57,6 +61,7 @@ beforeEach(async () => {
   // Re-wire chainable mocks after clearAllMocks
   mockDb.select.mockReturnThis();
   mockDb.from.mockReturnThis();
+  mockDb.leftJoin.mockReturnThis();
   mockDb.where.mockReturnThis();
   mockDb.orderBy.mockReturnThis();
   mockDb.limit.mockResolvedValue([]);
@@ -66,6 +71,7 @@ beforeEach(async () => {
   mockDb.delete.mockReturnThis();
   mockDb.update.mockReturnThis();
   mockDb.set.mockReturnThis();
+  mockDb.execute.mockResolvedValue([]);
 
   redisMock.status = 'ready';
   redisMock.get.mockResolvedValue(null);
@@ -94,7 +100,7 @@ describe('GET /api/feed', () => {
     // Feed rows query: .select().from().where().orderBy().limit(26) → []
     mockDb.limit
       .mockResolvedValueOnce([]) // feed rows
-      .mockResolvedValueOnce([{ count: 0 }]); // count
+      .mockResolvedValueOnce([{ total: 0, unread: 0 }]); // count
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -129,7 +135,7 @@ describe('GET /api/feed', () => {
 
     mockDb.limit
       .mockResolvedValueOnce(fakeRows) // feed rows (26)
-      .mockResolvedValueOnce([{ count: 30 }]); // count
+      .mockResolvedValueOnce([{ total: 30, unread: 30 }]); // count
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -163,7 +169,7 @@ describe('GET /api/feed', () => {
   });
 
   it('clamps hours param to MAX_HOURS (72)', async () => {
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -181,7 +187,7 @@ describe('GET /api/feed', () => {
       JSON.stringify({ occurredAt: cursorAt.toISOString(), id: 'event-005' }),
     ).toString('base64url');
 
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 5 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 5, unread: 5 }]);
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -197,7 +203,7 @@ describe('GET /api/feed', () => {
   });
 
   it('filters by valid provider param', async () => {
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -210,7 +216,7 @@ describe('GET /api/feed', () => {
   });
 
   it('returns X-Cache: MISS on cache bypass and writes to cache', async () => {
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -227,7 +233,7 @@ describe('GET /api/feed', () => {
   it('skips cache when Redis is not ready', async () => {
     redisMock.status = 'connecting';
 
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -259,7 +265,7 @@ describe('GET /api/feed', () => {
 
     mockDb.limit
       .mockResolvedValueOnce([botActivity]) // feed rows
-      .mockResolvedValueOnce([{ count: 1 }]); // count
+      .mockResolvedValueOnce([{ total: 1, unread: 1 }]); // count
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -282,7 +288,7 @@ describe('GET /api/feed', () => {
   it('returns empty feed when ?author= matches no events', async () => {
     mockDb.limit
       .mockResolvedValueOnce([]) // feed rows
-      .mockResolvedValueOnce([{ count: 0 }]); // count
+      .mockResolvedValueOnce([{ total: 0, unread: 0 }]); // count
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -299,7 +305,7 @@ describe('GET /api/feed', () => {
 
   it('includes author in the cache key (different authors produce different cache entries)', async () => {
     // First request — author=bot-a
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     await app.inject({
@@ -309,7 +315,7 @@ describe('GET /api/feed', () => {
     });
 
     // Second request — author=bot-b (cache miss expected because different key)
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     await app.inject({
       method: 'GET',

@@ -169,6 +169,42 @@ export type ActivityEvent = typeof activityEvents.$inferSelect;
 export type NewActivityEvent = typeof activityEvents.$inferInsert;
 
 // ---------------------------------------------------------------------------
+// event_reads  (per-event read/seen state — FUL-140)
+// ---------------------------------------------------------------------------
+// A thin join table recording that a given user has reviewed a given activity
+// event. An event is "read" for a user iff a matching row exists here.
+//
+// This is orthogonal to `users.lastSeenAt`: the watermark answers "what
+// happened while I was away", while these rows answer "which of those have I
+// actually reviewed". They compose — neither replaces the other. Modelling read
+// state as explicit rows (rather than a boolean on `activity_events`) keeps the
+// hot feed table lean and preserves a precise `readAt` timestamp per item.
+
+export const eventReads = pgTable(
+  'event_reads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => activityEvents.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Makes mark-read idempotent at the DB layer: re-marking the same event is a
+    // no-op via ON CONFLICT (user_id, event_id) DO NOTHING.
+    unique('event_reads_user_id_event_id_uniq').on(table.userId, table.eventId),
+    // Backs per-user unread counts / existence joins from the feed query.
+    index('event_reads_user_id_idx').on(table.userId),
+  ],
+);
+
+export type EventRead = typeof eventReads.$inferSelect;
+export type NewEventRead = typeof eventReads.$inferInsert;
+
+// ---------------------------------------------------------------------------
 // slack_alert_configs
 // ---------------------------------------------------------------------------
 

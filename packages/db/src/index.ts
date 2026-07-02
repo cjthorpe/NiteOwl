@@ -22,8 +22,10 @@ export {
 
 export type {
   ActivityEvent,
+  EventRead,
   Integration,
   NewActivityEvent,
+  NewEventRead,
   NewIntegration,
   NewOauthToken,
   NewPasswordResetToken,

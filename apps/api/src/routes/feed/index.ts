@@ -2,15 +2,31 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import type { Db } from '@niteowl/db';
 import { schema } from '@niteowl/db';
-import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
 import { requireAuth } from '../../plugins/auth.js';
+
+import { markAllEventsRead, markEventsRead, unmarkEventsRead } from './read-state.js';
 
 const CACHE_TTL_SECONDS = 60; // 1 minute — per FUL-22 spec
 const DEFAULT_HOURS = 8;
 const MAX_HOURS = 72;
 const PAGE_SIZE = 25;
+/** Upper bound on how many eventIds a single mark/unmark request may carry. */
+const MAX_EVENT_IDS = 500;
 
 interface FeedQuery {
   hours?: string;
@@ -25,6 +41,37 @@ interface FeedQuery {
   repo?: string;
   author?: string;
   cursor?: string;
+  /** `?unread=true` returns only events the caller has not yet marked read. */
+  unread?: string;
+}
+
+interface EventIdsBody {
+  eventIds?: unknown;
+}
+
+interface ReadAllBody {
+  before?: unknown;
+}
+
+/**
+ * Validate a `{ eventIds: string[] }` body: a non-empty array of strings, capped
+ * at MAX_EVENT_IDS. Returns the parsed ids, or a string describing the problem.
+ */
+function parseEventIds(body: EventIdsBody | undefined): string[] | { error: string } {
+  const raw = body?.eventIds;
+  if (!Array.isArray(raw)) {
+    return { error: 'eventIds must be an array of strings' };
+  }
+  if (raw.length === 0) {
+    return { error: 'eventIds must not be empty' };
+  }
+  if (raw.length > MAX_EVENT_IDS) {
+    return { error: `eventIds must contain at most ${MAX_EVENT_IDS} items` };
+  }
+  if (!raw.every((id): id is string => typeof id === 'string' && id.length > 0)) {
+    return { error: 'eventIds must be an array of non-empty strings' };
+  }
+  return raw;
 }
 
 interface CursorPayload {
@@ -65,12 +112,15 @@ function feedCacheKey(
   repo?: string,
   author?: string,
   cursor?: string,
+  unread?: boolean,
 ): string {
   const parts = [`feed:${userId}:${hours}`];
   if (provider) parts.push(`p:${provider}`);
   if (eventType) parts.push(`et:${eventType}`);
   if (repo) parts.push(`r:${repo}`);
   if (author) parts.push(`a:${author}`);
+  // `unread` changes the row set + total, so it must partition the cache.
+  if (unread) parts.push('u:1');
   if (cursor) parts.push(`c:${cursor}`);
   return parts.join(':');
 }
@@ -136,6 +186,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
       const repo = request.query.repo?.toLowerCase();
       const author = request.query.author?.trim() || undefined;
       const cursorRaw = request.query.cursor;
+      const unreadOnly = request.query.unread === 'true';
       // For cache-key purposes, encode `since=last_login` as the resolved ISO
       // timestamp so two users with different lastSeenAt values never share a
       // cache slot.
@@ -150,6 +201,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         repo,
         author,
         sinceKey ?? cursorRaw,
+        unreadOnly,
       );
 
       // ── Cache read ────────────────────────────────────────────────────────
@@ -162,10 +214,18 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         }
       }
 
-      const conditions: ReturnType<typeof eq>[] = [
+      const conditions: SQL[] = [
         eq(schema.activityEvents.userId, userId),
         gte(schema.activityEvents.occurredAt, since),
       ];
+
+      // Join condition tying each activity event to *this* user's read row (if
+      // any). Reused by both the row query and the unread count so the
+      // `read` flag and `unreadCount` are always derived from the same rule.
+      const readJoinOn = and(
+        eq(schema.eventReads.eventId, schema.activityEvents.id),
+        eq(schema.eventReads.userId, userId),
+      );
 
       const validProviders = ['github', 'linear', 'jira', 'slack'] as const;
       if (provider && validProviders.includes(provider as (typeof validProviders)[number])) {
@@ -204,10 +264,6 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         conditions.push(eq(schema.activityEvents.authorLogin, author));
       }
 
-      if (author) {
-        conditions.push(eq(schema.activityEvents.authorLogin, author));
-      }
-
       // cursor: events strictly before (occurredAt, id)
       const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
       if (cursor) {
@@ -223,9 +279,20 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         );
       }
 
+      // `?unread=true` narrows the page to events with no read row for this user.
+      if (unreadOnly) {
+        conditions.push(isNull(schema.eventReads.id));
+      }
+
+      // Each row is annotated with `read` via a LEFT JOIN on the caller's read
+      // rows — a matching row means the event has been reviewed.
       const rows = await db
-        .select()
+        .select({
+          ...getTableColumns(schema.activityEvents),
+          read: sql<boolean>`(${schema.eventReads.id} is not null)`,
+        })
         .from(schema.activityEvents)
+        .leftJoin(schema.eventReads, readJoinOn)
         .where(and(...conditions))
         .orderBy(desc(schema.activityEvents.occurredAt), desc(schema.activityEvents.id))
         .limit(PAGE_SIZE + 1); // fetch one extra to detect next page
@@ -233,10 +300,18 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
       const hasMore = rows.length > PAGE_SIZE;
       const activities = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
-      // ── Count (total matching rows for this query window, not just this page) ──
+      // ── Count (total matching rows for the query window, not just this page) ──
+      // A single grouped query yields both the window total and the unread
+      // subset (events with no read row for this user), sharing the same LEFT
+      // JOIN as the row query. `unread=true` never narrows these — the badge
+      // always reflects the full window.
       const [countRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({
+          total: sql<number>`count(*)::int`,
+          unread: sql<number>`count(*) filter (where ${schema.eventReads.id} is null)::int`,
+        })
         .from(schema.activityEvents)
+        .leftJoin(schema.eventReads, readJoinOn)
         .where(
           and(
             eq(schema.activityEvents.userId, userId),
@@ -248,6 +323,9 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
           ),
         )
         .limit(1);
+
+      const windowTotal = countRow?.total ?? 0;
+      const unreadCount = countRow?.unread ?? 0;
 
       // Apply repo filter post-query (metadata field) if provided
       const filtered = repo
@@ -270,7 +348,10 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
       const body = {
         activities: filtered,
         nextCursor,
-        total: countRow?.count ?? 0,
+        // When `unread=true` the page is the unread set, so `total` tracks the
+        // unread count to keep pagination totals consistent with the rows.
+        total: unreadOnly ? unreadCount : windowTotal,
+        unreadCount,
       };
 
       // ── Cache write ───────────────────────────────────────────────────────
@@ -281,6 +362,78 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
       void reply.header('X-Cache', 'MISS');
       return reply.code(200).send(body);
+    },
+  );
+
+  /**
+   * Invalidate the caller's cached feed pages after a read-state mutation so the
+   * next GET reflects the new `read` flags / `unreadCount` immediately (rather
+   * than serving a stale 60s cache entry).
+   */
+  const invalidate = async (userId: string): Promise<void> => {
+    const redis = fastify.redis;
+    if (redis.status === 'ready') {
+      await invalidateFeedCache(redis, userId);
+    }
+  };
+
+  // ── POST /read — mark specific events as read ─────────────────────────────
+  fastify.post<{ Body: EventIdsBody }>(
+    '/read',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const userId = request.user!.sub;
+      const parsed = parseEventIds(request.body);
+      if ('error' in parsed) {
+        return reply.code(400).send({ error: parsed.error });
+      }
+
+      const marked = await markEventsRead(db, userId, parsed);
+      await invalidate(userId);
+      return reply.code(200).send({ marked });
+    },
+  );
+
+  // ── POST /read-all — mark every event (optionally up to `before`) as read ──
+  fastify.post<{ Body: ReadAllBody }>(
+    '/read-all',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const userId = request.user!.sub;
+
+      let before: Date | undefined;
+      const beforeRaw = request.body?.before;
+      if (beforeRaw !== undefined && beforeRaw !== null) {
+        if (typeof beforeRaw !== 'string') {
+          return reply.code(400).send({ error: 'before must be an ISO 8601 timestamp string' });
+        }
+        const parsedDate = new Date(beforeRaw);
+        if (Number.isNaN(parsedDate.getTime())) {
+          return reply.code(400).send({ error: 'before must be a valid ISO 8601 timestamp' });
+        }
+        before = parsedDate;
+      }
+
+      const marked = await markAllEventsRead(db, userId, before);
+      await invalidate(userId);
+      return reply.code(200).send({ marked });
+    },
+  );
+
+  // ── DELETE /read — mark specific events as unread ─────────────────────────
+  fastify.delete<{ Body: EventIdsBody }>(
+    '/read',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const userId = request.user!.sub;
+      const parsed = parseEventIds(request.body);
+      if ('error' in parsed) {
+        return reply.code(400).send({ error: parsed.error });
+      }
+
+      const unmarked = await unmarkEventsRead(db, userId, parsed);
+      await invalidate(userId);
+      return reply.code(200).send({ unmarked });
     },
   );
 };
