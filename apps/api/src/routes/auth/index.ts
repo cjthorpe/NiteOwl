@@ -12,6 +12,7 @@ import { originCheck } from '../../lib/origin-check.js';
 import { REFRESH_COOKIE } from './constants.js';
 import { emailAuthRoutes } from './email.js';
 import { githubAuthRoutes } from './github.js';
+import { jiraAuthRoutes } from './jira.js';
 import { linearAuthRoutes } from './linear.js';
 import { passwordResetRoutes } from './password-reset.js';
 import { tokenRoutes } from './tokens.js';
@@ -27,6 +28,9 @@ export const authRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
   // ── Linear OAuth ──────────────────────────────────────────────────────────
   void fastify.register(linearAuthRoutes, { ...opts, prefix: '' });
+
+  // ── Jira OAuth (Atlassian 3LO) ────────────────────────────────────────────
+  void fastify.register(jiraAuthRoutes, { ...opts, prefix: '' });
 
   // ── Password reset (forgot-password + reset-password) ─────────────────────
   void fastify.register(passwordResetRoutes, { ...opts, prefix: '' });

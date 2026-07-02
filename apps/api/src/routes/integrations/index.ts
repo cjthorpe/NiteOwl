@@ -9,6 +9,7 @@ import { parseRepoAllowlist } from '../../lib/repo-allowlist.js';
 import { requireAuth } from '../../plugins/auth.js';
 
 import { githubCatchupRoutes } from './github-catchup-route.js';
+import { jiraCatchupRoutes } from './jira-catchup.js';
 import { linearCatchupRoutes } from './linear-catchup.js';
 
 // ---------------------------------------------------------------------------
@@ -186,4 +187,7 @@ export const integrationsRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify
 
   // ── GitHub-specific routes (catchup) ─────────────────────────────────────
   void fastify.register(githubCatchupRoutes, { db });
+
+  // ── Jira-specific routes (catchup) ───────────────────────────────────────
+  void fastify.register(jiraCatchupRoutes, { db });
 };
