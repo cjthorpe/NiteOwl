@@ -32,6 +32,7 @@ vi.mock('ioredis', () => {
 const mockDb = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
+  leftJoin: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   orderBy: vi.fn().mockReturnThis(),
   limit: vi.fn().mockResolvedValue([]),
@@ -41,6 +42,7 @@ const mockDb = {
   delete: vi.fn().mockReturnThis(),
   update: vi.fn().mockReturnThis(),
   set: vi.fn().mockReturnThis(),
+  execute: vi.fn().mockResolvedValue([]),
 };
 
 const USER_ID = 'b1234567-0000-0000-0000-000000000001';
@@ -53,6 +55,7 @@ beforeEach(async () => {
 
   mockDb.select.mockReturnThis();
   mockDb.from.mockReturnThis();
+  mockDb.leftJoin.mockReturnThis();
   mockDb.where.mockReturnThis();
   mockDb.orderBy.mockReturnThis();
   mockDb.limit.mockResolvedValue([]);
@@ -62,6 +65,7 @@ beforeEach(async () => {
   mockDb.delete.mockReturnThis();
   mockDb.update.mockReturnThis();
   mockDb.set.mockReturnThis();
+  mockDb.execute.mockResolvedValue([]);
 
   redisMock.status = 'ready';
   redisMock.get.mockResolvedValue(null);
@@ -157,7 +161,7 @@ describe('GET /api/feed?since=last_login', () => {
 
     mockDb.limit
       .mockResolvedValueOnce([]) // feed rows
-      .mockResolvedValueOnce([{ count: 0 }]); // count
+      .mockResolvedValueOnce([{ total: 0, unread: 0 }]); // count
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -176,7 +180,7 @@ describe('GET /api/feed?since=last_login', () => {
     const token = await signAccessToken(USER_ID, 'user@example.com', null);
     const authHeader = `Bearer ${token}`;
 
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     const res = await app.inject({
@@ -194,7 +198,7 @@ describe('GET /api/feed?since=last_login', () => {
     const authHeader = `Bearer ${token}`;
 
     // First request: since=last_login
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
     const app = buildApp({ db: mockDb as never });
     await app.inject({
       method: 'GET',
@@ -203,7 +207,7 @@ describe('GET /api/feed?since=last_login', () => {
     });
 
     // Second request: no since param (uses default hours)
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
     await app.inject({
       method: 'GET',
       url: '/api/feed',
@@ -224,7 +228,7 @@ describe('GET /api/feed?since=last_login', () => {
     const authHeader = `Bearer ${token}`;
 
     // First request — cache miss, DB queried
-    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+    mockDb.limit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0, unread: 0 }]);
 
     const app = buildApp({ db: mockDb as never });
     await app.inject({

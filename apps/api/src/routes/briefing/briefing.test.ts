@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Fullstack Forge
 /**
  * Integration tests for GET /api/briefing/digest (FUL-136).
  * Uses Fastify inject + mock DB — no real network. The LLM is disabled in the
