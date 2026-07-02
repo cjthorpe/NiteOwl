@@ -60,6 +60,44 @@ interface JiraIssuePayload {
 }
 
 // ---------------------------------------------------------------------------
+// Shared canonical issue shape
+// ---------------------------------------------------------------------------
+
+/**
+ * Provider-agnostic-within-Jira issue shape. BOTH the webhook path and the REST
+ * catch-up poller build one of these and feed it through
+ * {@link canonicalJiraIssueToActivity}, guaranteeing they synthesize the SAME
+ * `activity_events.external_id` for the same state transition. Divergence here
+ * is the GitHub Events-API-vs-repo-scan double-ingest bug class (FUL-98/99);
+ * routing both paths through one core is what keeps dedup honest (FUL-123
+ * plan, trap #1).
+ */
+export interface CanonicalJiraIssue {
+  id: string;
+  key: string;
+  /**
+   * The webhook event string this state maps to — the tail of the external id.
+   * Catch-up chooses `jira:issue_created` for issues created inside the lookback
+   * window, else `jira:issue_updated`, so it collides with the webhook rows.
+   */
+  webhookEvent: string;
+  /** Browser URL, e.g. https://acme.atlassian.net/browse/PROJ-42 */
+  browseUrl: string;
+  summary: string;
+  description?: string | null;
+  issueType: string;
+  projectKey: string;
+  projectName: string;
+  statusName: string;
+  statusCategoryKey: string;
+  assignee?: string | null;
+  reporter?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolutionDate?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Event type resolution
 // ---------------------------------------------------------------------------
 
@@ -78,22 +116,102 @@ function resolveJiraIssueEventType(webhookEvent: string): ActivityEventType | nu
 }
 
 function refineJiraUpdateType(
-  payload: JiraIssuePayload,
+  statusCategoryKey: string,
   base: ActivityEventType,
 ): ActivityEventType {
   if (base !== 'issue_updated') return base;
-  const statusCategoryKey = payload.issue.fields.status.statusCategory.key.toLowerCase();
-  if (statusCategoryKey === 'done') return 'issue_closed';
+  if (statusCategoryKey.toLowerCase() === 'done') return 'issue_closed';
   return 'issue_updated';
 }
 
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
+/**
+ * Deterministic external id for an issue event. MUST match the webhook path's
+ * `sourceId` so `ON CONFLICT DO NOTHING` dedups webhook + catch-up rows.
+ */
+export function jiraIssueExternalId(issueId: string, webhookEvent: string): string {
+  return `issue:${issueId}:${webhookEvent}`;
+}
 
 // ---------------------------------------------------------------------------
-// Comment normalizer
+// Shared core: canonical issue → Activity
 // ---------------------------------------------------------------------------
+
+/**
+ * The single source of truth for turning a Jira issue (from any path) into a
+ * normalized Activity. Returns null only if the webhook event string is not an
+ * issue event we track.
+ */
+export function canonicalJiraIssueToActivity(
+  issue: CanonicalJiraIssue,
+  userId: string,
+): Activity | null {
+  const baseEventType = resolveJiraIssueEventType(issue.webhookEvent);
+  if (baseEventType === null) return null;
+
+  const eventType = refineJiraUpdateType(issue.statusCategoryKey, baseEventType);
+
+  const occurredAt =
+    eventType === 'issue_closed' && issue.resolutionDate != null
+      ? issue.resolutionDate
+      : issue.updatedAt;
+
+  return {
+    id: crypto.randomUUID(),
+    userId,
+    provider: 'jira',
+    eventType,
+    sourceId: jiraIssueExternalId(issue.id, issue.webhookEvent),
+    title: `[${issue.projectKey}] ${issue.key}: ${issue.summary}`,
+    ...(issue.description != null ? { description: issue.description } : {}),
+    url: issue.browseUrl,
+    metadata: {
+      issueKey: issue.key,
+      issueType: issue.issueType,
+      projectKey: issue.projectKey,
+      projectName: issue.projectName,
+      status: issue.statusName,
+      statusCategory: issue.statusCategoryKey,
+      assignee: issue.assignee ?? null,
+      reporter: issue.reporter ?? null,
+      webhookEvent: issue.webhookEvent,
+    },
+    occurredAt,
+    ingestedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Webhook → canonical adapters
+// ---------------------------------------------------------------------------
+
+function webhookIssueToCanonical(typed: JiraIssuePayload): CanonicalJiraIssue {
+  const { issue } = typed;
+  const fields = issue.fields;
+
+  // Jira issue URL: derive from self (API URL) → browser URL not in payload,
+  // so we reconstruct from the self host + /browse/<key>.
+  const selfUrl = new URL(issue.self);
+  const browseUrl = `${selfUrl.protocol}//${selfUrl.host}/browse/${issue.key}`;
+
+  return {
+    id: issue.id,
+    key: issue.key,
+    webhookEvent: typed.webhookEvent,
+    browseUrl,
+    summary: fields.summary,
+    description: fields.description ?? null,
+    issueType: fields.issuetype.name,
+    projectKey: fields.project.key,
+    projectName: fields.project.name,
+    statusName: fields.status.name,
+    statusCategoryKey: fields.status.statusCategory.key,
+    assignee: fields.assignee?.displayName ?? null,
+    reporter: fields.reporter?.displayName ?? null,
+    createdAt: fields.created,
+    updatedAt: fields.updated,
+    resolutionDate: fields.resolutiondate ?? null,
+  };
+}
 
 function normalizeJiraComment(typed: JiraCommentPayload, userId: string): Activity | null {
   if (typed.webhookEvent !== 'comment_created') return null;
@@ -132,7 +250,7 @@ function normalizeJiraComment(typed: JiraCommentPayload, userId: string): Activi
 }
 
 // ---------------------------------------------------------------------------
-// Public entry point
+// Public entry point (webhook path)
 // ---------------------------------------------------------------------------
 
 /**
@@ -176,44 +294,7 @@ export function normalizeJiraEvent(
   }
 
   const typed = payload as unknown as JiraIssuePayload;
-  const baseEventType = resolveJiraIssueEventType(typed.webhookEvent);
-  if (baseEventType === null) return null;
+  if (resolveJiraIssueEventType(typed.webhookEvent) === null) return null;
 
-  const eventType = refineJiraUpdateType(typed, baseEventType);
-  const { issue } = typed;
-  const fields = issue.fields;
-
-  const occurredAt =
-    eventType === 'issue_closed' && fields.resolutiondate != null
-      ? fields.resolutiondate
-      : fields.updated;
-
-  // Jira issue URL: derive from self (API URL) → browser URL not in payload,
-  // so we reconstruct from the self host + /browse/<key>.
-  const selfUrl = new URL(issue.self);
-  const browseUrl = `${selfUrl.protocol}//${selfUrl.host}/browse/${issue.key}`;
-
-  return {
-    id: crypto.randomUUID(),
-    userId,
-    provider: 'jira',
-    eventType,
-    sourceId: `issue:${issue.id}:${typed.webhookEvent}`,
-    title: `[${fields.project.key}] ${issue.key}: ${fields.summary}`,
-    ...(fields.description != null ? { description: fields.description } : {}),
-    url: browseUrl,
-    metadata: {
-      issueKey: issue.key,
-      issueType: fields.issuetype.name,
-      projectKey: fields.project.key,
-      projectName: fields.project.name,
-      status: fields.status.name,
-      statusCategory: fields.status.statusCategory.key,
-      assignee: fields.assignee?.displayName ?? null,
-      reporter: fields.reporter?.displayName ?? null,
-      webhookEvent: typed.webhookEvent,
-    },
-    occurredAt,
-    ingestedAt: new Date().toISOString(),
-  };
+  return canonicalJiraIssueToActivity(webhookIssueToCanonical(typed), userId);
 }

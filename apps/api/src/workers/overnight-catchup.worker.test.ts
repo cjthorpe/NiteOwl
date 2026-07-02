@@ -52,6 +52,12 @@ vi.mock('../lib/github-repo-scan.js', () => ({
   runGitHubRepoScan: mockRunGitHubRepoScan,
 }));
 
+const mockRunJiraCatchup = vi.fn();
+
+vi.mock('../lib/jira-catchup.js', () => ({
+  runJiraCatchup: mockRunJiraCatchup,
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -69,16 +75,29 @@ interface GithubRow {
   accessToken: string;
 }
 
-function makeDb(linearRows: LinearRow[], githubRows: GithubRow[] = []) {
-  // The processor runs the Linear integration query first, then the GitHub one.
-  // `.where` terminates each select chain, so resolve linear rows on the first
-  // call and github rows on the second. `.update(...).set(...).where(...)` (the
-  // lastSyncedAt stamp) is not exercised here.
+interface JiraRow {
+  integrationId: string;
+  userId: string;
+  configJson: { cloudId?: unknown; siteUrl?: unknown } | null;
+  accessTokenEncrypted: string;
+  refreshTokenEncrypted: string | null;
+  expiresAt: Date | null;
+}
+
+function makeDb(linearRows: LinearRow[], githubRows: GithubRow[] = [], jiraRows: JiraRow[] = []) {
+  // The processor runs the Linear query first, then GitHub, then Jira.
+  // `.where` terminates each select chain, so resolve the rows in that order.
+  // `.update(...).set(...).where(...)` (the lastSyncedAt stamp) is not exercised
+  // here.
   const query = {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     innerJoin: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValueOnce(linearRows).mockResolvedValueOnce(githubRows),
+    where: vi
+      .fn()
+      .mockResolvedValueOnce(linearRows)
+      .mockResolvedValueOnce(githubRows)
+      .mockResolvedValueOnce(jiraRows),
   };
   return query as unknown as Parameters<
     (typeof import('./overnight-catchup.worker.js'))['createOvernightCatchupWorker']
@@ -98,6 +117,7 @@ describe('overnight-catchup worker', () => {
     // implementation must survive across tests in this file).
     mockRunLinearCatchup.mockReset();
     mockRunGitHubRepoScan.mockReset();
+    mockRunJiraCatchup.mockReset();
   });
 
   it('processes all active Linear integrations and accumulates ingested count', async () => {
@@ -173,6 +193,74 @@ describe('overnight-catchup worker', () => {
   it('exports the correct queue name constant', async () => {
     const { OVERNIGHT_CATCHUP_QUEUE } = await import('./overnight-catchup.worker.js');
     expect(OVERNIGHT_CATCHUP_QUEUE).toBe('overnight-catchup');
+  });
+
+  // FUL-141: Jira integrations are ingested via runJiraCatchup, passing cloudId +
+  // siteUrl from configJson and the encrypted token fields for in-run refresh.
+  it('processes active Jira integrations with cloudId + siteUrl and encrypted tokens', async () => {
+    const { createOvernightCatchupWorker } = await import('./overnight-catchup.worker.js');
+
+    mockRunJiraCatchup.mockResolvedValueOnce({ ingested: 4 });
+
+    const expiresAt = new Date('2026-07-02T00:00:00Z');
+    const db = makeDb(
+      [],
+      [],
+      [
+        {
+          integrationId: 'jira-int-1',
+          userId: 'user-9',
+          configJson: { cloudId: 'cloud-abc', siteUrl: 'https://acme.atlassian.net' },
+          accessTokenEncrypted: 'enc-access',
+          refreshTokenEncrypted: 'enc-refresh',
+          expiresAt,
+        },
+      ],
+    );
+
+    createOvernightCatchupWorker(db, redisOptions);
+
+    await expect(capturedProcessor!({ id: 'job-jira' })).resolves.toBeUndefined();
+
+    expect(mockRunJiraCatchup).toHaveBeenCalledTimes(1);
+    expect(mockRunJiraCatchup).toHaveBeenCalledWith({
+      db,
+      userId: 'user-9',
+      integrationId: 'jira-int-1',
+      cloudId: 'cloud-abc',
+      siteUrl: 'https://acme.atlassian.net',
+      accessTokenEncrypted: 'enc-access',
+      refreshTokenEncrypted: 'enc-refresh',
+      expiresAt,
+    });
+  });
+
+  it('skips a Jira integration missing cloudId/siteUrl without aborting the job', async () => {
+    const { createOvernightCatchupWorker } = await import('./overnight-catchup.worker.js');
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const db = makeDb(
+      [],
+      [],
+      [
+        {
+          integrationId: 'jira-bad',
+          userId: 'user-9',
+          configJson: { cloudId: 'cloud-only' }, // no siteUrl
+          accessTokenEncrypted: 'enc-access',
+          refreshTokenEncrypted: null,
+          expiresAt: null,
+        },
+      ],
+    );
+
+    createOvernightCatchupWorker(db, redisOptions);
+
+    await expect(capturedProcessor!({ id: 'job-jira-bad' })).resolves.toBeUndefined();
+
+    expect(mockRunJiraCatchup).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('jira-bad'));
   });
 
   // FUL-98: GitHub integrations are ingested via the deterministic repo-scan

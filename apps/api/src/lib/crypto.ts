@@ -18,6 +18,19 @@ export function generateOAuthState(): string {
 }
 
 /**
+ * PKCE (RFC 7636) verifier/challenge pair for Authorization Code flows that
+ * support it (e.g. Atlassian 3LO). The verifier is a high-entropy URL-safe
+ * secret kept server-side; the S256 challenge is sent on the authorize
+ * redirect and re-derived at token-exchange time to prove the same client
+ * completed both legs of the flow.
+ */
+export function generatePkcePair(): { verifier: string; challenge: string } {
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  return { verifier, challenge };
+}
+
+/**
  * Timing-safe string comparison — use for any security-sensitive equality
  * check (OAuth state, webhook signatures, CSRF tokens) to prevent
  * timing-based side-channel attacks.

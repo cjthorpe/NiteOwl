@@ -182,8 +182,76 @@ export function createOvernightCatchupWorker(
         }
       }
 
+      // ── Jira integrations ────────────────────────────────────────────────────
+      //
+      // FUL-141: fetch recently-updated issues via the Jira REST search API and
+      // normalize them through the SHARED canonical core so their external ids
+      // collide with the webhook path (no double-ingest). configJson carries
+      // both cloudId (for REST) and siteUrl (for webhook/external-id parity).
+      // runJiraCatchup refreshes + rotates the Atlassian token as needed.
+
+      const jiraRows = await db
+        .select({
+          integrationId: schema.integrations.id,
+          userId: schema.integrations.userId,
+          configJson: schema.integrations.configJson,
+          accessTokenEncrypted: schema.oauthTokens.accessTokenEncrypted,
+          refreshTokenEncrypted: schema.oauthTokens.refreshTokenEncrypted,
+          expiresAt: schema.oauthTokens.expiresAt,
+        })
+        .from(schema.integrations)
+        .innerJoin(
+          schema.oauthTokens,
+          and(
+            eq(schema.oauthTokens.userId, schema.integrations.userId),
+            eq(schema.oauthTokens.provider, 'jira'),
+          ),
+        )
+        .where(
+          and(eq(schema.integrations.provider, 'jira'), eq(schema.integrations.enabled, true)),
+        );
+
+      for (const row of jiraRows) {
+        const config = (row.configJson as { cloudId?: unknown; siteUrl?: unknown } | null) ?? {};
+        const cloudId = typeof config.cloudId === 'string' ? config.cloudId : null;
+        const siteUrl = typeof config.siteUrl === 'string' ? config.siteUrl : null;
+
+        if (!cloudId || !siteUrl) {
+          console.error(
+            `${label} jira integration=${row.integrationId} missing cloudId/siteUrl — skipping`,
+          );
+          totalErrors++;
+          continue;
+        }
+
+        try {
+          const { runJiraCatchup } = await import('../lib/jira-catchup.js');
+          const result = await runJiraCatchup({
+            db,
+            userId: row.userId,
+            integrationId: row.integrationId,
+            cloudId,
+            siteUrl,
+            accessTokenEncrypted: row.accessTokenEncrypted,
+            refreshTokenEncrypted: row.refreshTokenEncrypted,
+            expiresAt: row.expiresAt,
+          });
+          totalIngested += result.ingested;
+          console.info(
+            `${label} jira user=${row.userId} integration=${row.integrationId} ingested=${result.ingested}`,
+          );
+        } catch (err) {
+          totalErrors++;
+          console.error(
+            `${label} jira catchup failed integration=${row.integrationId}`,
+            err instanceof Error ? err.message : err,
+          );
+          // Continue with remaining integrations — do not abort the job.
+        }
+      }
+
       console.info(
-        `${label} complete — ingested=${totalIngested} errors=${totalErrors} linear_integrations=${linearRows.length} github_integrations=${githubRows.length}`,
+        `${label} complete — ingested=${totalIngested} errors=${totalErrors} linear_integrations=${linearRows.length} github_integrations=${githubRows.length} jira_integrations=${jiraRows.length}`,
       );
     },
     {
