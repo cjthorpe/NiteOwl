@@ -3,8 +3,7 @@
 import { decrypt, encrypt } from '@niteowl/db';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-
-import { normalizeJiraEvent , canonicalJiraIssueToActivity } from '../normalizers/jira.js';
+import { normalizeJiraEvent, canonicalJiraIssueToActivity } from '../normalizers/jira.js';
 
 import { restIssueToCanonical, runJiraCatchup, type JiraRestIssue } from './jira-catchup.js';
 

@@ -25,10 +25,7 @@ import type { Db } from '@niteowl/db';
 import { schema, decryptToken, encrypt } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 
-import {
-  canonicalJiraIssueToActivity,
-  type CanonicalJiraIssue,
-} from '../normalizers/jira.js';
+import { canonicalJiraIssueToActivity, type CanonicalJiraIssue } from '../normalizers/jira.js';
 
 import { refreshJiraToken } from './jira-oauth.js';
 
@@ -192,9 +189,7 @@ async function ensureFreshAccessToken(
   const refreshed = await refreshJiraToken(refreshToken);
 
   const newExpiresAt =
-    refreshed.expires_in != null
-      ? new Date(now.getTime() + refreshed.expires_in * 1000)
-      : null;
+    refreshed.expires_in != null ? new Date(now.getTime() + refreshed.expires_in * 1000) : null;
 
   // Persist the new access token AND the rotated refresh token. Dropping the
   // rotated refresh token would 400 the next run (plan trap #2).

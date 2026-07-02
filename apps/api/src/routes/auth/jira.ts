@@ -5,8 +5,12 @@ import { schema, encrypt } from '@niteowl/db';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-
-import { generateOAuthState, generatePkcePair, sha256, timingSafeCompare } from '../../lib/crypto.js';
+import {
+  generateOAuthState,
+  generatePkcePair,
+  sha256,
+  timingSafeCompare,
+} from '../../lib/crypto.js';
 import {
   JIRA_AUTHORIZE_URL,
   JIRA_OAUTH_SCOPE,
@@ -74,7 +78,11 @@ export const jiraAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { 
 
       // Embed userId + PKCE verifier in the state cookie so the callback can
       // associate the token with the right user and complete the PKCE exchange.
-      const stateCookieValue = JSON.stringify({ state, userId, verifier } satisfies JiraStateCookie);
+      const stateCookieValue = JSON.stringify({
+        state,
+        userId,
+        verifier,
+      } satisfies JiraStateCookie);
 
       void reply.setCookie(STATE_COOKIE, stateCookieValue, {
         httpOnly: true,

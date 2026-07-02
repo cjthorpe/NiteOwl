@@ -5,7 +5,6 @@ import { schema } from '@niteowl/db';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
-
 import { runJiraCatchup } from '../../lib/jira-catchup.js';
 import { requireAuth } from '../../plugins/auth.js';
 
