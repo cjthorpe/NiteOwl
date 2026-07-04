@@ -84,7 +84,11 @@ async function getLinearViewer(accessToken: string): Promise<LinearViewer> {
 }
 
 export const linearAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
-  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3000';
+  // Default matches the API's own listen port (PORT/API_PORT default 3001) and
+  // VITE_API_URL — NOT 3000. This redirect_uri must equal the callback URL
+  // registered in the Linear app; a wrong host/port breaks the OAuth return
+  // leg (see FUL-141 for the equivalent Jira bug).
+  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001';
   const redirectUri = `${apiUrl}/auth/linear/callback`;
 
   // ── GET /auth/linear ── Initiate Linear OAuth ─────────────────────────────

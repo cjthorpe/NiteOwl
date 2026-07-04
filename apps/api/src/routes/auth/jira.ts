@@ -29,7 +29,13 @@ interface JiraStateCookie {
 }
 
 export const jiraAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, { db }) => {
-  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3000';
+  // Default matches the API's own listen port (PORT/API_PORT default 3001) and
+  // VITE_API_URL — NOT 3000. The redirect_uri built here must be a URL the
+  // browser can reach AND the exact callback registered in the Atlassian app;
+  // a wrong host/port here makes Atlassian silently bounce the user to their
+  // Home page after login (FUL-141). GitHub OAuth never hit this because it
+  // sends no redirect_uri.
+  const apiUrl = process.env['API_URL'] ?? 'http://localhost:3001';
   const redirectUri = `${apiUrl}/auth/jira/callback`;
 
   // ── GET /auth/jira ── Initiate Atlassian 3LO ────────────────────────────────
