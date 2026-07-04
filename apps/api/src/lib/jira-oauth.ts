@@ -20,11 +20,20 @@ export const JIRA_ACCESSIBLE_RESOURCES_URL =
   'https://api.atlassian.com/oauth/token/accessible-resources';
 
 /**
- * Requested scopes. `offline_access` is REQUIRED to receive a refresh token —
- * without it Atlassian returns an access token only and the poller cannot
- * survive the ~1h expiry window. `read:jira-work` covers issue/search reads.
+ * Requested scopes — kept to the minimum the catch-up poller actually uses
+ * (least privilege). `read:jira-work` covers the only REST call we make
+ * (`/rest/api/3/search/jql`), including the assignee/reporter display names
+ * returned inline on each issue. `offline_access` is REQUIRED to receive a
+ * refresh token — without it Atlassian returns an access token only and the
+ * poller cannot survive the ~1h expiry window.
+ *
+ * We deliberately do NOT request `read:jira-user` (the `/user` endpoints),
+ * which the code never calls: asking for a scope the operator's OAuth app has
+ * not granted is a known cause of Atlassian silently bouncing the user to
+ * their Home page after login instead of showing the consent screen. Keeping
+ * the request minimal maximises the chance a freshly-configured app connects.
  */
-export const JIRA_OAUTH_SCOPE = 'read:jira-work read:jira-user offline_access';
+export const JIRA_OAUTH_SCOPE = 'read:jira-work offline_access';
 
 export interface JiraTokenResponse {
   access_token: string;

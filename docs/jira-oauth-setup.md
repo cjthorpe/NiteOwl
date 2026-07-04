@@ -41,11 +41,15 @@ scopes don't line up. See Troubleshooting below.
 
 In <https://developer.atlassian.com/console/myapps/> → your app:
 
-- **Permissions** → add **Jira platform REST API**, and enable the scopes NiteOwl
-  requests (see `JIRA_OAUTH_SCOPE` in `apps/api/src/lib/jira-oauth.ts`):
+- **Permissions** → add **Jira platform REST API**, and enable the two scopes
+  NiteOwl requests (see `JIRA_OAUTH_SCOPE` in `apps/api/src/lib/jira-oauth.ts`):
   - `read:jira-work`
-  - `read:jira-user`
   - `offline_access` (grants the rotating refresh token the catch-up poller needs)
+
+  NiteOwl requests only these two (least privilege). The app may have additional
+  scopes enabled, but it must grant at least these two — and NiteOwl must not
+  request any scope the app lacks, or Atlassian bounces the user to Home.
+
 - **Authorization** → **OAuth 2.0 (3LO)** → **Configure** → set the **Callback URL**
   to **exactly** `{API_URL}/auth/jira/callback` — same scheme, host, port, and
   path, **no trailing slash**. A mismatch here is the #1 cause of the
@@ -75,13 +79,13 @@ in the console app or the `JIRA_*` variables.
 
 ## Troubleshooting
 
-| Symptom                                                                            | Likely cause                                                                                             | Fix                                                                                                     |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Sign in → **Atlassian Home / start.atlassian.com**, no consent, never returns      | Callback URL in the console ≠ `{API_URL}/auth/jira/callback`, or the app is missing the requested scopes | Correct the Callback URL to an exact match; add the Jira REST API permission with all three scopes      |
-| NiteOwl shows **"Jira OAuth not configured"** (HTTP 503) before reaching Atlassian | `JIRA_CLIENT_ID` unset on the API                                                                        | Set `JIRA_CLIENT_ID` / `JIRA_CLIENT_SECRET` and restart the API                                         |
-| Returns to NiteOwl with `status=error&error=state_mismatch`                        | State cookie lost (blocked third-party cookies, or `API_URL` host differs between connect and callback)  | Ensure the connect and callback both use the same `API_URL` host                                        |
-| Already-signed-in users bounce to `start.atlassian.com`, but a fresh sign-in works | Known Atlassian session edge case when the callback URL isn't an exact match                             | Make the Callback URL exact; a full Atlassian sign-out also clears it                                   |
-| Returns `status=error&error=no_site`                                               | Token has no accessible Jira sites                                                                       | Ensure the connecting Atlassian user has access to at least one Jira site and granted it during consent |
+| Symptom                                                                            | Likely cause                                                                                             | Fix                                                                                                                   |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Sign in → **Atlassian Home / start.atlassian.com**, no consent, never returns      | Callback URL in the console ≠ `{API_URL}/auth/jira/callback`, or the app is missing the requested scopes | Correct the Callback URL to an exact match; add the Jira REST API permission with `read:jira-work` + `offline_access` |
+| NiteOwl shows **"Jira OAuth not configured"** (HTTP 503) before reaching Atlassian | `JIRA_CLIENT_ID` unset on the API                                                                        | Set `JIRA_CLIENT_ID` / `JIRA_CLIENT_SECRET` and restart the API                                                       |
+| Returns to NiteOwl with `status=error&error=state_mismatch`                        | State cookie lost (blocked third-party cookies, or `API_URL` host differs between connect and callback)  | Ensure the connect and callback both use the same `API_URL` host                                                      |
+| Already-signed-in users bounce to `start.atlassian.com`, but a fresh sign-in works | Known Atlassian session edge case when the callback URL isn't an exact match                             | Make the Callback URL exact; a full Atlassian sign-out also clears it                                                 |
+| Returns `status=error&error=no_site`                                               | Token has no accessible Jira sites                                                                       | Ensure the connecting Atlassian user has access to at least one Jira site and granted it during consent               |
 
 ## Verifying a successful connect
 
