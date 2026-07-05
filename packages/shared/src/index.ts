@@ -18,15 +18,6 @@ export type {
 } from './briefing-digest';
 export { buildBriefingDigest } from './briefing-digest';
 
-export type { EncryptedToken } from './crypto';
-export {
-  decryptToken,
-  encryptToken,
-  parseEncryptedToken,
-  serializeEncryptedToken,
-  timingSafeCompare,
-} from './crypto';
-
 export type { EntitledAccount, FeatureKey, PlanTier } from './entitlements';
 export {
   capabilitiesFor,
