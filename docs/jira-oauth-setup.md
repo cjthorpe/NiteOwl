@@ -63,8 +63,9 @@ In <https://developer.atlassian.com/console/myapps/> → your app:
   "stuck on Atlassian Home" symptom.
 - **Settings** → copy the **Client ID** and **Secret** into `JIRA_CLIENT_ID` /
   `JIRA_CLIENT_SECRET`. Double-check the Client ID belongs to the **same app**
-  you set the callback + scope on — a `.env` client*id pointing at a different
-  app makes Atlassian reject the request \_after* login (silent bounce to Home).
+  you set the callback + scope on — a `.env` `JIRA_CLIENT_ID` pointing at a
+  different app makes Atlassian reject the request **after** login (silent bounce
+  to Home).
 - **Distribution** → set **Sharing** to **Enabled** (it asks for a Vendor name +
   privacy-policy URL; any reasonable values are fine). A newly-created 3LO app is
   in **developer mode**, which only works for the app's creator account and can
