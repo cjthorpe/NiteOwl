@@ -18,11 +18,11 @@ touches the database in plaintext.
 
 Encrypted fields (as of this writing):
 
-| Table                 | Column                     | Nullable | Contents                                          |
-| --------------------- | -------------------------- | -------- | ------------------------------------------------- |
-| `oauth_tokens`        | `access_token_encrypted`   | no       | GitHub / Linear / Jira OAuth access tokens        |
-| `oauth_tokens`        | `refresh_token_encrypted`  | yes      | OAuth refresh tokens (Jira; others where present) |
-| `slack_alert_configs` | `webhook_url_encrypted`    | no       | Slack incoming-webhook URLs                        |
+| Table                 | Column                    | Nullable | Contents                                          |
+| --------------------- | ------------------------- | -------- | ------------------------------------------------- |
+| `oauth_tokens`        | `access_token_encrypted`  | no       | GitHub / Linear / Jira OAuth access tokens        |
+| `oauth_tokens`        | `refresh_token_encrypted` | yes      | OAuth refresh tokens (Jira; others where present) |
+| `slack_alert_configs` | `webhook_url_encrypted`   | no       | Slack incoming-webhook URLs                       |
 
 Write sites live in the OAuth callback routes (`apps/api/src/routes/auth/*`), the
 Jira catch-up poller (`apps/api/src/lib/jira-catchup.ts`), the Slack alerts route
@@ -75,7 +75,7 @@ returning corrupt plaintext.
 > (you cannot leave a mix of old- and new-key rows and decrypt each with the key
 > it was written under). Rotation is a **re-encryption migration** that must
 > complete **atomically per deployment**: every encrypted row must be
-> re-encrypted with the new key *before* the `DB_ENCRYPTION_KEY` environment
+> re-encrypted with the new key _before_ the `DB_ENCRYPTION_KEY` environment
 > variable is swapped to the new value.
 
 Recommended sequence:
