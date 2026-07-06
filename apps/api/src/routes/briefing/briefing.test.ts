@@ -109,4 +109,65 @@ describe('GET /api/briefing/digest', () => {
     expect(body.highlights[0]?.kind).toBe('needs_review');
     expect(body.highlights.some((h) => h.kind === 'providers')).toBe(true);
   });
+
+  // FUL-142: an overnight catch-up backfills events whose provider timestamps
+  // (occurred_at) predate the user's last login but whose ingested_at is fresh.
+  // The `since=last_login` window must key off ingestion so those events surface
+  // in the briefing instead of collapsing to "all quiet".
+  it('windows since=last_login on ingested_at, not occurred_at', async () => {
+    const captured: unknown[] = [];
+    mockDb.where.mockImplementation((clause: unknown) => {
+      captured.push(clause);
+      return mockDb;
+    });
+
+    const token = await signAccessToken(
+      USER_ID,
+      'test@example.com',
+      new Date('2026-07-05T20:00:00.000Z'),
+    );
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/briefing/digest?since=last_login',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(whereColumnNames(captured).has('ingested_at')).toBe(true);
+    expect(whereColumnNames(captured).has('occurred_at')).toBe(false);
+  });
+
+  it('windows the hours fallback on occurred_at', async () => {
+    const captured: unknown[] = [];
+    mockDb.where.mockImplementation((clause: unknown) => {
+      captured.push(clause);
+      return mockDb;
+    });
+
+    const app = buildApp({ db: mockDb as never });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/briefing/digest?hours=24',
+      headers: { authorization: authHeader },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(whereColumnNames(captured).has('occurred_at')).toBe(true);
+    expect(whereColumnNames(captured).has('ingested_at')).toBe(false);
+  });
 });
+
+/** Recursively collect Drizzle column names referenced by captured WHERE clauses. */
+function whereColumnNames(clauses: readonly unknown[]): Set<string> {
+  const names = new Set<string>();
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return;
+    const obj = node as Record<string, unknown>;
+    if (typeof obj['name'] === 'string' && 'columnType' in obj) names.add(obj['name'] as string);
+    const chunks = obj['queryChunks'];
+    if (Array.isArray(chunks)) chunks.forEach(visit);
+  };
+  clauses.forEach(visit);
+  return names;
+}

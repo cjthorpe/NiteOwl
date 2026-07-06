@@ -17,13 +17,12 @@ import {
 } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
+import { resolveActivityWindow } from '../../lib/activity-window.js';
 import { requireAuth } from '../../plugins/auth.js';
 
 import { markAllEventsRead, markEventsRead, unmarkEventsRead } from './read-state.js';
 
 const CACHE_TTL_SECONDS = 60; // 1 minute — per FUL-22 spec
-const DEFAULT_HOURS = 8;
-const MAX_HOURS = 72;
 const PAGE_SIZE = 25;
 /** Upper bound on how many eventIds a single mark/unmark request may carry. */
 const MAX_EVENT_IDS = 500;
@@ -160,25 +159,16 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
       // ── Resolve the feed window start time ────────────────────────────────
       // `?since=last_login` resolves to the user's previous session timestamp
-      // (snapshotted in the JWT at login). All other cases use `?hours`.
-      let since: Date;
-      let hours: number;
-      if (request.query.since === 'last_login') {
-        const jwtLastSeenAt = request.user!.lastSeenAt;
-        if (jwtLastSeenAt) {
-          since = new Date(jwtLastSeenAt);
-          hours = Math.ceil((Date.now() - since.getTime()) / (60 * 60 * 1000));
-        } else {
-          // First-ever session — fall back to the default window
-          hours = DEFAULT_HOURS;
-          since = new Date(Date.now() - hours * 60 * 60 * 1000);
-        }
-      } else {
-        const hoursRaw = parseInt(request.query.hours ?? String(DEFAULT_HOURS), 10);
-        hours =
-          Number.isNaN(hoursRaw) || hoursRaw < 1 ? DEFAULT_HOURS : Math.min(hoursRaw, MAX_HOURS);
-        since = new Date(Date.now() - hours * 60 * 60 * 1000);
-      }
+      // (snapshotted in the JWT at login) and windows on ingestion so an
+      // overnight catch-up's backfilled events still surface (FUL-142). All
+      // other cases use the temporal `?hours` window on occurred_at.
+      const { since, hours, byIngestion } = resolveActivityWindow(
+        request.query,
+        request.user!.lastSeenAt,
+      );
+      const windowColumn = byIngestion
+        ? schema.activityEvents.ingestedAt
+        : schema.activityEvents.occurredAt;
 
       const provider = request.query.provider?.toLowerCase();
       // eventType accepts a single value or a comma-separated list of DB event types.
@@ -216,7 +206,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
 
       const conditions: SQL[] = [
         eq(schema.activityEvents.userId, userId),
-        gte(schema.activityEvents.occurredAt, since),
+        gte(windowColumn, since),
       ];
 
       // Join condition tying each activity event to *this* user's read row (if
@@ -315,7 +305,7 @@ export const feedRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, opts) 
         .where(
           and(
             eq(schema.activityEvents.userId, userId),
-            gte(schema.activityEvents.occurredAt, since),
+            gte(windowColumn, since),
             ...(provider && validProviders.includes(provider as (typeof validProviders)[number])
               ? [eq(schema.activityEvents.provider, provider as (typeof validProviders)[number])]
               : []),
