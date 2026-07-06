@@ -24,6 +24,8 @@ export interface FeedParams {
   hours: number;
   providers: ActivityProvider[];
   eventTypes: EventType[];
+  repo?: string;
+  author?: string;
   cursor?: string;
 }
 
@@ -44,6 +46,12 @@ export async function fetchFeedPage(params: FeedParams): Promise<FeedPage> {
     if (dbTypes.length > 0) {
       url.searchParams.set('eventType', dbTypes.join(','));
     }
+  }
+  if (params.repo) {
+    url.searchParams.set('repo', params.repo);
+  }
+  if (params.author) {
+    url.searchParams.set('author', params.author);
   }
   if (params.cursor) {
     url.searchParams.set('cursor', params.cursor);

@@ -58,6 +58,56 @@ describe('useFilters', () => {
     expect(result.current.filters.eventTypes).toEqual(['prs', 'commits']);
   });
 
+  it('defaults repo and author to empty strings', () => {
+    const { result } = renderHook(() => useFilters(), { wrapper: wrapper() });
+    expect(result.current.filters.repo).toBe('');
+    expect(result.current.filters.author).toBe('');
+  });
+
+  it('parses repo from URL', () => {
+    const { result } = renderHook(() => useFilters(), {
+      wrapper: wrapper({ initialSearch: '?repo=acme/widgets' }),
+    });
+    expect(result.current.filters.repo).toBe('acme/widgets');
+    expect(result.current.hasActiveFilters).toBe(true);
+  });
+
+  it('parses and trims author from URL', () => {
+    const { result } = renderHook(() => useFilters(), {
+      wrapper: wrapper({ initialSearch: '?author=%20octocat%20' }),
+    });
+    expect(result.current.filters.author).toBe('octocat');
+    expect(result.current.hasActiveFilters).toBe(true);
+  });
+
+  it('setRepo updates the repo param', () => {
+    const { result } = renderHook(() => useFilters(), { wrapper: wrapper() });
+    act(() => {
+      result.current.setRepo('acme/widgets');
+    });
+    expect(result.current.filters.repo).toBe('acme/widgets');
+    expect(result.current.hasActiveFilters).toBe(true);
+  });
+
+  it('setRepo with empty value removes the param', () => {
+    const { result } = renderHook(() => useFilters(), {
+      wrapper: wrapper({ initialSearch: '?repo=acme/widgets' }),
+    });
+    act(() => {
+      result.current.setRepo('   ');
+    });
+    expect(result.current.filters.repo).toBe('');
+    expect(result.current.hasActiveFilters).toBe(false);
+  });
+
+  it('setAuthor updates the author param', () => {
+    const { result } = renderHook(() => useFilters(), { wrapper: wrapper() });
+    act(() => {
+      result.current.setAuthor('octocat');
+    });
+    expect(result.current.filters.author).toBe('octocat');
+  });
+
   it('setTimeRange updates the time range', () => {
     const { result } = renderHook(() => useFilters(), { wrapper: wrapper() });
     act(() => {
@@ -136,7 +186,9 @@ describe('useFilters', () => {
 
   it('clearAll resets all filters', () => {
     const { result } = renderHook(() => useFilters(), {
-      wrapper: wrapper({ initialSearch: '?time=24h&integrations=github&events=prs' }),
+      wrapper: wrapper({
+        initialSearch: '?time=24h&integrations=github&events=prs&repo=acme/widgets&author=octocat',
+      }),
     });
     act(() => {
       result.current.clearAll();
@@ -144,6 +196,8 @@ describe('useFilters', () => {
     expect(result.current.filters.timeRange).toBe('8h');
     expect(result.current.filters.integrations).toEqual([]);
     expect(result.current.filters.eventTypes).toEqual([]);
+    expect(result.current.filters.repo).toBe('');
+    expect(result.current.filters.author).toBe('');
     expect(result.current.hasActiveFilters).toBe(false);
   });
 

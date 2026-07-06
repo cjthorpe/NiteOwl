@@ -34,6 +34,8 @@ export function ActivityFeed() {
     toggleEventType,
     removeIntegration,
     removeEventType,
+    setRepo,
+    setAuthor,
     clearAll,
     hasActiveFilters,
   } = useFilters();
@@ -42,6 +44,8 @@ export function ActivityFeed() {
     hours: timeRangeToHours(filters.timeRange),
     providers: filters.integrations as ActivityProvider[],
     eventTypes: filters.eventTypes,
+    repo: filters.repo,
+    author: filters.author,
   };
 
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -58,6 +62,8 @@ export function ActivityFeed() {
         onEventTypeToggle={toggleEventType}
         onRemoveIntegration={removeIntegration}
         onRemoveEventType={removeEventType}
+        onRepoChange={setRepo}
+        onAuthorChange={setAuthor}
         onClearAll={clearAll}
         hasActiveFilters={hasActiveFilters}
       />
