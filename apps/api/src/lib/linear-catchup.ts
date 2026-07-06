@@ -127,6 +127,12 @@ export interface LinearCatchupOptions {
 }
 
 export interface LinearCatchupResult {
+  /**
+   * Items fetched from Linear before the dedup insert (FUL-145). Surfaced so the
+   * ingestion-observability layer can detect the `fetched>0 inserted==0` silent
+   * failure class.
+   */
+  fetched: number;
   /** Number of activity_events rows inserted (deduped rows excluded) */
   ingested: number;
 }
@@ -148,7 +154,7 @@ export async function runLinearCatchup(opts: LinearCatchupOptions): Promise<Line
       .update(schema.integrations)
       .set({ lastSyncedAt: new Date() })
       .where(eq(schema.integrations.id, integrationId));
-    return { ingested: 0 };
+    return { fetched: 0, ingested: 0 };
   }
 
   const rows = issues.map((issue) => {
@@ -186,5 +192,5 @@ export async function runLinearCatchup(opts: LinearCatchupOptions): Promise<Line
     .set({ lastSyncedAt: new Date() })
     .where(eq(schema.integrations.id, integrationId));
 
-  return { ingested: rows.length };
+  return { fetched: issues.length, ingested: rows.length };
 }

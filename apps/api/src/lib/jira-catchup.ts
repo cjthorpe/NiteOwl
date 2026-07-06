@@ -234,6 +234,12 @@ export interface JiraCatchupOptions {
 }
 
 export interface JiraCatchupResult {
+  /**
+   * Issues fetched from Jira before dedup/normalization (FUL-145). Surfaced so
+   * the ingestion-observability layer can detect the `fetched>0 inserted==0`
+   * silent failure class.
+   */
+  fetched: number;
   /** Number of activity_events rows offered for insert (pre-dedup). */
   ingested: number;
 }
@@ -276,7 +282,7 @@ export async function runJiraCatchup(opts: JiraCatchupOptions): Promise<JiraCatc
       .update(schema.integrations)
       .set({ lastSyncedAt: now })
       .where(eq(schema.integrations.id, integrationId));
-    return { ingested: 0 };
+    return { fetched: 0, ingested: 0 };
   }
 
   const rows = issues
@@ -309,5 +315,5 @@ export async function runJiraCatchup(opts: JiraCatchupOptions): Promise<JiraCatc
     .set({ lastSyncedAt: now })
     .where(eq(schema.integrations.id, integrationId));
 
-  return { ingested: rows.length };
+  return { fetched: issues.length, ingested: rows.length };
 }

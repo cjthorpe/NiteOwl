@@ -8,6 +8,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { generateOAuthState, sha256, timingSafeCompare } from '../../lib/crypto.js';
 import { runGitHubRepoScan } from '../../lib/github-repo-scan.js';
 import { signRefreshToken } from '../../lib/jwt.js';
+import { reportIngestionRun } from '../../lib/metrics.js';
 
 import { REFRESH_COOKIE } from './constants.js';
 
@@ -297,6 +298,20 @@ export const githubAuthRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify, 
           logger: fastify.log,
         })
           .then((result) => {
+            // FUL-145: report the post-login backfill into the observability
+            // layer. Map repo-scan `total`→fetched, `ingested`→inserted so a
+            // `fetched>0 inserted==0` blackout on connect raises a Slack alert
+            // and bumps ingestion_silent_failures_total. Non-blocking + gated on
+            // SLACK_ALERT_WEBHOOK_URL (unset → clean no-op).
+            void reportIngestionRun({
+              provider: 'github',
+              source: 'post_login',
+              fetched: result.total,
+              inserted: result.ingested,
+              errors: result.errors,
+            }).catch(() => {
+              /* observability must never break the login flow */
+            });
             fastify.log.info(
               {
                 userId,

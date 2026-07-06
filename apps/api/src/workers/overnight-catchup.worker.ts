@@ -24,12 +24,15 @@
  *  - Per-integration results are logged at info level.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type { Db } from '@niteowl/db';
 import { decryptToken, schema } from '@niteowl/db';
 import { Worker } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 
 import { runLinearCatchup } from '../lib/linear-catchup.js';
+import { ingestionErrorsTotal, reportIngestionRun, timeSpan } from '../lib/metrics.js';
 
 // ---------------------------------------------------------------------------
 // Queue name + job data type
@@ -64,7 +67,12 @@ export function createOvernightCatchupWorker(
     OVERNIGHT_CATCHUP_QUEUE,
     async (job) => {
       const label = `[overnight-catchup] job ${job.id ?? '?'}`;
-      console.info(`${label} starting`);
+      // Per-run correlation id (FUL-145): threaded into every span log and the
+      // silent-ingestion Slack alert so a blackout can be traced end-to-end.
+      const traceId = randomUUID();
+      // Gate the silent-ingestion alert on the webhook; unset → clean no-op.
+      const webhookUrl = process.env['SLACK_ALERT_WEBHOOK_URL'];
+      console.info(`${label} starting trace=${traceId}`);
 
       let totalIngested = 0;
       let totalErrors = 0;
@@ -95,18 +103,34 @@ export function createOvernightCatchupWorker(
 
       for (const row of linearRows) {
         try {
-          const result = await runLinearCatchup({
-            db,
-            userId: row.userId,
-            integrationId: row.integrationId,
-            accessToken: decryptToken(row.accessToken),
-          });
+          const result = await timeSpan(
+            { name: 'linear.catchup', provider: 'linear', source: 'catchup', traceId },
+            () =>
+              runLinearCatchup({
+                db,
+                userId: row.userId,
+                integrationId: row.integrationId,
+                accessToken: decryptToken(row.accessToken),
+              }),
+          );
           totalIngested += result.ingested;
+          // Record counters + fire the silent-ingestion alert on a blackout.
+          await reportIngestionRun(
+            {
+              provider: 'linear',
+              source: 'catchup',
+              fetched: result.fetched,
+              inserted: result.ingested,
+              traceId,
+            },
+            { webhookUrl },
+          );
           console.info(
-            `${label} linear user=${row.userId} integration=${row.integrationId} ingested=${result.ingested}`,
+            `${label} linear user=${row.userId} integration=${row.integrationId} fetched=${result.fetched} ingested=${result.ingested}`,
           );
         } catch (err) {
           totalErrors++;
+          ingestionErrorsTotal.inc({ provider: 'linear', source: 'catchup' }, 1);
           console.error(
             `${label} linear catchup failed integration=${row.integrationId}`,
             err instanceof Error ? err.message : err,
@@ -150,16 +174,33 @@ export function createOvernightCatchupWorker(
       for (const row of githubRows) {
         try {
           const { runGitHubRepoScan } = await import('../lib/github-repo-scan.js');
-          const result = await runGitHubRepoScan({
-            db,
-            userId: row.userId,
-            integrationId: row.integrationId,
-            accessToken: decryptToken(row.accessToken),
-            since,
-            until,
-            config: row.configJson as { repoAllowlist?: unknown } | null,
-          });
+          const result = await timeSpan(
+            { name: 'github.repo_scan', provider: 'github', source: 'repo_scan', traceId },
+            () =>
+              runGitHubRepoScan({
+                db,
+                userId: row.userId,
+                integrationId: row.integrationId,
+                accessToken: decryptToken(row.accessToken),
+                since,
+                until,
+                config: row.configJson as { repoAllowlist?: unknown } | null,
+              }),
+          );
           totalIngested += result.ingested;
+          // Map repo-scan `total`→fetched, `ingested`→inserted (FUL-145). This is
+          // the exact FUL-98 blackout shape: total>0 && ingested==0.
+          await reportIngestionRun(
+            {
+              provider: 'github',
+              source: 'repo_scan',
+              fetched: result.total,
+              inserted: result.ingested,
+              errors: result.errors,
+              traceId,
+            },
+            { webhookUrl },
+          );
           console.info(
             `${label} github user=${row.userId} integration=${row.integrationId} reposScanned=${result.reposScanned} ingested=${result.ingested} total=${result.total} errors=${result.errors}`,
           );
@@ -174,6 +215,7 @@ export function createOvernightCatchupWorker(
           }
         } catch (err) {
           totalErrors++;
+          ingestionErrorsTotal.inc({ provider: 'github', source: 'repo_scan' }, 1);
           console.error(
             `${label} github repo-scan failed integration=${row.integrationId}`,
             err instanceof Error ? err.message : err,
@@ -226,22 +268,37 @@ export function createOvernightCatchupWorker(
 
         try {
           const { runJiraCatchup } = await import('../lib/jira-catchup.js');
-          const result = await runJiraCatchup({
-            db,
-            userId: row.userId,
-            integrationId: row.integrationId,
-            cloudId,
-            siteUrl,
-            accessTokenEncrypted: row.accessTokenEncrypted,
-            refreshTokenEncrypted: row.refreshTokenEncrypted,
-            expiresAt: row.expiresAt,
-          });
+          const result = await timeSpan(
+            { name: 'jira.catchup', provider: 'jira', source: 'catchup', traceId },
+            () =>
+              runJiraCatchup({
+                db,
+                userId: row.userId,
+                integrationId: row.integrationId,
+                cloudId,
+                siteUrl,
+                accessTokenEncrypted: row.accessTokenEncrypted,
+                refreshTokenEncrypted: row.refreshTokenEncrypted,
+                expiresAt: row.expiresAt,
+              }),
+          );
           totalIngested += result.ingested;
+          await reportIngestionRun(
+            {
+              provider: 'jira',
+              source: 'catchup',
+              fetched: result.fetched,
+              inserted: result.ingested,
+              traceId,
+            },
+            { webhookUrl },
+          );
           console.info(
-            `${label} jira user=${row.userId} integration=${row.integrationId} ingested=${result.ingested}`,
+            `${label} jira user=${row.userId} integration=${row.integrationId} fetched=${result.fetched} ingested=${result.ingested}`,
           );
         } catch (err) {
           totalErrors++;
+          ingestionErrorsTotal.inc({ provider: 'jira', source: 'catchup' }, 1);
           console.error(
             `${label} jira catchup failed integration=${row.integrationId}`,
             err instanceof Error ? err.message : err,

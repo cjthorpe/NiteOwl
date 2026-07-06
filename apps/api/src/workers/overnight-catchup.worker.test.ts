@@ -58,6 +58,10 @@ vi.mock('../lib/jira-catchup.js', () => ({
   runJiraCatchup: mockRunJiraCatchup,
 }));
 
+// The metrics + slack-alert layers run for real (not mocked) so the blackout
+// test exercises the full worker → reportIngestionRun → sendSlackAlert wiring.
+import { ingestionSilentFailuresTotal, register as metricsRegister } from '../lib/metrics.js';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -335,6 +339,53 @@ describe('overnight-catchup worker', () => {
     );
 
     consoleErrorSpy.mockRestore();
+  });
+
+  // FUL-145: a repo-scan that fetched items but inserted none is the FUL-98
+  // silent-failure class. The worker must fire a Slack alert AND bump
+  // ingestion_silent_failures_total. This exercises the real metrics +
+  // slack-alert modules (only the catch-up libs and BullMQ are mocked).
+  it('fires a Slack alert and bumps the counter on a simulated blackout', async () => {
+    const { createOvernightCatchupWorker } = await import('./overnight-catchup.worker.js');
+    metricsRegister.resetMetrics();
+
+    // fetched (total) > 0 but inserted (ingested) == 0 → blackout.
+    mockRunGitHubRepoScan.mockResolvedValueOnce({
+      reposScanned: 3,
+      ingested: 0,
+      total: 42,
+      errors: 0,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' });
+    vi.stubGlobal('fetch', fetchMock);
+    process.env['SLACK_ALERT_WEBHOOK_URL'] = 'https://hooks.slack.test/blackout';
+    const consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    const db = makeDb(
+      [],
+      [{ integrationId: 'gh-blackout', userId: 'u1', configJson: null, accessToken: 'tok' }],
+    );
+
+    createOvernightCatchupWorker(db, redisOptions);
+    await expect(capturedProcessor!({ id: 'job-blackout' })).resolves.toBeUndefined();
+
+    // Slack alert dispatched to the configured webhook with the blackout message.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('https://hooks.slack.test/blackout');
+    expect(String(init.body)).toContain('Silent ingestion failure');
+
+    // Counter bumped for the github/repo_scan run.
+    const { values } = await ingestionSilentFailuresTotal.get();
+    const github = values.find(
+      (v) => v.labels['provider'] === 'github' && v.labels['source'] === 'repo_scan',
+    );
+    expect(github?.value).toBe(1);
+
+    delete process.env['SLACK_ALERT_WEBHOOK_URL'];
+    consoleInfoSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 });
 

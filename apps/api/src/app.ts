@@ -3,10 +3,12 @@
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { createDb } from '@niteowl/db';
+import { createDb, schema } from '@niteowl/db';
 import type { HealthStatus } from '@niteowl/types';
+import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
 
+import { register, setIngestionLag, setQueueDepth } from './lib/metrics.js';
 import authPlugin from './plugins/auth.js';
 import queuePlugin from './plugins/queue.js';
 import redisPlugin from './plugins/redis.js';
@@ -119,6 +121,45 @@ export function buildApp(opts: BuildAppOptions = {}) {
 
   app.get('/health', healthHandler);
   app.get('/api/health', healthHandler);
+
+  // ── Observability: Prometheus metrics (FUL-145) ───────────────────────────
+  // Registered next to /health, unauthenticated (scraped by Prometheus). Two
+  // series are sampled at scrape time; both are wrapped defensively so a DB or
+  // Redis hiccup degrades to stale/zero gauges rather than failing the scrape:
+  //  - ingestion_lag_seconds  ← seconds since max(ingested_at)  (FUL-142)
+  //  - ingestion_queue_depth  ← BullMQ getJobCounts() per ingestion queue
+  app.get('/metrics', async (_request, reply) => {
+    try {
+      const [row] = await db
+        .select({ max: sql<string | null>`max(${schema.activityEvents.ingestedAt})` })
+        .from(schema.activityEvents);
+      setIngestionLag(row?.max ? new Date(row.max) : null);
+    } catch (err) {
+      app.log.warn({ err }, '[metrics] failed to sample ingestion lag');
+    }
+
+    // The queue decorations only exist when the BullMQ plugin is wired
+    // (production). In test mode they are undefined and simply skipped.
+    const ingestionQueues: Array<
+      [string, { getJobCounts: () => Promise<Record<string, number>> } | null | undefined]
+    > = [
+      [
+        'overnight-catchup',
+        app.hasDecorator('overnightCatchupQueue') ? app.overnightCatchupQueue : null,
+      ],
+      ['normalization', app.hasDecorator('normalizationQueue') ? app.normalizationQueue : null],
+    ];
+    for (const [name, queue] of ingestionQueues) {
+      if (!queue) continue;
+      try {
+        setQueueDepth(name, await queue.getJobCounts());
+      } catch (err) {
+        app.log.warn({ err, queue: name }, '[metrics] failed to sample queue depth');
+      }
+    }
+
+    return reply.header('Content-Type', register.contentType).send(await register.metrics());
+  });
 
   // Auth routes — stricter rate limits applied per-route via config.rateLimit
   void app.register(authRoutes, { prefix: '/auth', db });
