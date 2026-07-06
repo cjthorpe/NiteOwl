@@ -15,6 +15,7 @@ import {
 import { EventTypeFilter } from './EventTypeFilter';
 import { FilterChip } from './FilterChip';
 import { IntegrationFilter } from './IntegrationFilter';
+import { TextFilter } from './TextFilter';
 import { TimeRangeSelector } from './TimeRangeSelector';
 
 interface FilterBarProps {
@@ -24,6 +25,8 @@ interface FilterBarProps {
   onEventTypeToggle: UseFiltersReturn['toggleEventType'];
   onRemoveIntegration: UseFiltersReturn['removeIntegration'];
   onRemoveEventType: UseFiltersReturn['removeEventType'];
+  onRepoChange: UseFiltersReturn['setRepo'];
+  onAuthorChange: UseFiltersReturn['setAuthor'];
   onClearAll: UseFiltersReturn['clearAll'];
   hasActiveFilters: boolean;
 }
@@ -35,6 +38,8 @@ export function FilterBar({
   onEventTypeToggle,
   onRemoveIntegration,
   onRemoveEventType,
+  onRepoChange,
+  onAuthorChange,
   onClearAll,
   hasActiveFilters,
 }: FilterBarProps) {
@@ -70,6 +75,26 @@ export function FilterBar({
     );
   });
 
+  if (filters.repo) {
+    activeChips.push(
+      <FilterChip
+        key={`repo-${filters.repo}`}
+        label={`Repo: ${filters.repo}`}
+        onRemove={() => onRepoChange('')}
+      />,
+    );
+  }
+
+  if (filters.author) {
+    activeChips.push(
+      <FilterChip
+        key={`author-${filters.author}`}
+        label={`Author: ${filters.author}`}
+        onRemove={() => onAuthorChange('')}
+      />,
+    );
+  }
+
   return (
     <section className="filter-bar" aria-label="Activity filters">
       <div className="filter-bar__controls">
@@ -78,6 +103,19 @@ export function FilterBar({
         <IntegrationFilter value={filters.integrations} onChange={onIntegrationToggle} />
         <div className="filter-bar__divider" role="separator" aria-hidden="true" />
         <EventTypeFilter value={filters.eventTypes} onChange={onEventTypeToggle} />
+        <div className="filter-bar__divider" role="separator" aria-hidden="true" />
+        <TextFilter
+          label="Repo"
+          value={filters.repo}
+          onCommit={onRepoChange}
+          placeholder="owner/repo"
+        />
+        <TextFilter
+          label="Author"
+          value={filters.author}
+          onCommit={onAuthorChange}
+          placeholder="username"
+        />
       </div>
 
       {hasActiveFilters && (

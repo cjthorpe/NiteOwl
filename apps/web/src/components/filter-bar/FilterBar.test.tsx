@@ -17,6 +17,8 @@ const defaultProps = {
   onEventTypeToggle: vi.fn(),
   onRemoveIntegration: vi.fn(),
   onRemoveEventType: vi.fn(),
+  onRepoChange: vi.fn(),
+  onAuthorChange: vi.fn(),
   onClearAll: vi.fn(),
   hasActiveFilters: false,
 };
@@ -84,6 +86,7 @@ describe('FilterBar', () => {
 
   it('renders active filter chips and clear all when hasActiveFilters', () => {
     const filters: FilterState = {
+      ...DEFAULT_FILTERS,
       timeRange: '24h',
       integrations: ['github'],
       eventTypes: ['prs'],
@@ -102,6 +105,7 @@ describe('FilterBar', () => {
     const user = userEvent.setup();
     const onClearAll = vi.fn();
     const filters: FilterState = {
+      ...DEFAULT_FILTERS,
       timeRange: '24h',
       integrations: ['github'],
       eventTypes: [],
@@ -146,5 +150,66 @@ describe('FilterBar', () => {
 
     await user.click(screen.getByRole('button', { name: /remove filter: last 24h/i }));
     expect(onTimeRangeChange).toHaveBeenCalledWith('8h');
+  });
+
+  it('renders the repo and author text inputs', () => {
+    renderFilterBar();
+    expect(screen.getByLabelText('Repo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Author')).toBeInTheDocument();
+  });
+
+  it('reflects the committed repo and author values in the inputs', () => {
+    const filters: FilterState = {
+      ...DEFAULT_FILTERS,
+      repo: 'acme/widgets',
+      author: 'octocat',
+    };
+    renderFilterBar({ filters, hasActiveFilters: true });
+    expect(screen.getByLabelText('Repo')).toHaveValue('acme/widgets');
+    expect(screen.getByLabelText('Author')).toHaveValue('octocat');
+  });
+
+  it('commits repo on Enter', async () => {
+    const user = userEvent.setup();
+    const onRepoChange = vi.fn();
+    renderFilterBar({ onRepoChange });
+
+    await user.type(screen.getByLabelText('Repo'), 'acme/widgets{Enter}');
+    expect(onRepoChange).toHaveBeenCalledWith('acme/widgets');
+  });
+
+  it('commits author on blur', async () => {
+    const user = userEvent.setup();
+    const onAuthorChange = vi.fn();
+    renderFilterBar({ onAuthorChange });
+
+    await user.type(screen.getByLabelText('Author'), 'octocat');
+    await user.tab();
+    expect(onAuthorChange).toHaveBeenCalledWith('octocat');
+  });
+
+  it('renders repo and author chips and removes them via chip X', async () => {
+    const user = userEvent.setup();
+    const onRepoChange = vi.fn();
+    const onAuthorChange = vi.fn();
+    const filters: FilterState = {
+      ...DEFAULT_FILTERS,
+      repo: 'acme/widgets',
+      author: 'octocat',
+    };
+    renderFilterBar({ filters, hasActiveFilters: true, onRepoChange, onAuthorChange });
+
+    expect(
+      screen.getByRole('group', { name: 'Active filter: Repo: acme/widgets' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Active filter: Author: octocat' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /remove filter: repo: acme\/widgets/i }));
+    expect(onRepoChange).toHaveBeenCalledWith('');
+
+    await user.click(screen.getByRole('button', { name: /remove filter: author: octocat/i }));
+    expect(onAuthorChange).toHaveBeenCalledWith('');
   });
 });

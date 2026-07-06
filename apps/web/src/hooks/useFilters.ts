@@ -16,6 +16,8 @@ import {
 const PARAM_TIME = 'time';
 const PARAM_INTEGRATIONS = 'integrations';
 const PARAM_EVENTS = 'events';
+const PARAM_REPO = 'repo';
+const PARAM_AUTHOR = 'author';
 
 function isTimeRange(value: string): value is TimeRange {
   return ['8h', '12h', '24h', 'custom'].includes(value);
@@ -31,6 +33,11 @@ function parseEventTypes(raw: string | null): EventType[] {
   return raw.split(',').filter((v): v is EventType => (ALL_EVENT_TYPES as string[]).includes(v));
 }
 
+/** Normalize a free-text param: trim, and treat empty as unset. */
+function parseText(raw: string | null): string {
+  return raw?.trim() ?? '';
+}
+
 export interface UseFiltersReturn {
   filters: FilterState;
   setTimeRange: (range: TimeRange) => void;
@@ -38,6 +45,8 @@ export interface UseFiltersReturn {
   toggleEventType: (eventType: EventType) => void;
   removeIntegration: (integration: Integration) => void;
   removeEventType: (eventType: EventType) => void;
+  setRepo: (repo: string) => void;
+  setAuthor: (author: string) => void;
   clearAll: () => void;
   hasActiveFilters: boolean;
 }
@@ -50,11 +59,42 @@ export function useFilters(): UseFiltersReturn {
     rawTime && isTimeRange(rawTime) ? rawTime : DEFAULT_FILTERS.timeRange;
   const integrations = parseIntegrations(searchParams.get(PARAM_INTEGRATIONS));
   const eventTypes = parseEventTypes(searchParams.get(PARAM_EVENTS));
+  const repo = parseText(searchParams.get(PARAM_REPO));
+  const author = parseText(searchParams.get(PARAM_AUTHOR));
 
-  const filters: FilterState = { timeRange, integrations, eventTypes };
+  const filters: FilterState = { timeRange, integrations, eventTypes, repo, author };
 
   const hasActiveFilters =
-    timeRange !== DEFAULT_FILTERS.timeRange || integrations.length > 0 || eventTypes.length > 0;
+    timeRange !== DEFAULT_FILTERS.timeRange ||
+    integrations.length > 0 ||
+    eventTypes.length > 0 ||
+    repo.length > 0 ||
+    author.length > 0;
+
+  const setTextParam = useCallback(
+    (param: string, value: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const trimmed = value.trim();
+          if (trimmed) {
+            next.set(param, trimmed);
+          } else {
+            next.delete(param);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setRepo = useCallback((repo: string) => setTextParam(PARAM_REPO, repo), [setTextParam]);
+  const setAuthor = useCallback(
+    (author: string) => setTextParam(PARAM_AUTHOR, author),
+    [setTextParam],
+  );
 
   const setTimeRange = useCallback(
     (range: TimeRange) => {
@@ -169,6 +209,8 @@ export function useFilters(): UseFiltersReturn {
         next.delete(PARAM_TIME);
         next.delete(PARAM_INTEGRATIONS);
         next.delete(PARAM_EVENTS);
+        next.delete(PARAM_REPO);
+        next.delete(PARAM_AUTHOR);
         return next;
       },
       { replace: true },
@@ -182,6 +224,8 @@ export function useFilters(): UseFiltersReturn {
     toggleEventType,
     removeIntegration,
     removeEventType,
+    setRepo,
+    setAuthor,
     clearAll,
     hasActiveFilters,
   };

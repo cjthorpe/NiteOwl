@@ -10,12 +10,18 @@ export interface FilterState {
   timeRange: TimeRange;
   integrations: Integration[];
   eventTypes: EventType[];
+  /** Free-text repository filter (substring match, case-insensitive). Empty string = unset. */
+  repo: string;
+  /** Free-text author-login filter (exact match). Empty string = unset. */
+  author: string;
 }
 
 export const DEFAULT_FILTERS: FilterState = {
   timeRange: '8h',
   integrations: [],
   eventTypes: [],
+  repo: '',
+  author: '',
 };
 
 export const TIME_RANGE_LABELS: Record<TimeRange, string> = {

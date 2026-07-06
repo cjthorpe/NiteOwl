@@ -10,6 +10,8 @@ export interface FeedQueryFilters {
   hours: number;
   providers: ActivityProvider[];
   eventTypes: EventType[];
+  repo?: string;
+  author?: string;
 }
 
 export function useFeed(filters: FeedQueryFilters) {
@@ -20,6 +22,8 @@ export function useFeed(filters: FeedQueryFilters) {
         hours: filters.hours,
         providers: filters.providers,
         eventTypes: filters.eventTypes,
+        ...(filters.repo ? { repo: filters.repo } : {}),
+        ...(filters.author ? { author: filters.author } : {}),
         ...(pageParam !== undefined && { cursor: pageParam }),
       }),
     initialPageParam: undefined as string | undefined,
