@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 
 import { runGitHubRepoScan } from '../../lib/github-repo-scan.js';
+import { reportIngestionRun } from '../../lib/metrics.js';
 import { requireAuth } from '../../plugins/auth.js';
 
 // Re-exported so existing tests (and callers) keep importing the GitHub REST
@@ -95,6 +96,17 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
         logger: request.log,
       })
         .then((result) => {
+          // FUL-145: report the sync into the observability layer (repo_scan).
+          // total→fetched, ingested→inserted; a blackout raises a Slack alert.
+          void reportIngestionRun({
+            provider: 'github',
+            source: 'repo_scan',
+            fetched: result.total,
+            inserted: result.ingested,
+            errors: result.errors,
+          }).catch(() => {
+            /* observability must never break the sync */
+          });
           request.log.info(
             {
               userId,
@@ -219,6 +231,17 @@ export const githubCatchupRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
           until: untilDate,
           config: integration.configJson as { repoAllowlist?: unknown } | null,
           logger: request.log,
+        });
+
+        // FUL-145: report into the observability layer (repo_scan). total→fetched,
+        // ingested→inserted; a `fetched>0 inserted==0` blackout raises a Slack
+        // alert and bumps ingestion_silent_failures_total.
+        await reportIngestionRun({
+          provider: 'github',
+          source: 'repo_scan',
+          fetched: result.total,
+          inserted: result.ingested,
+          errors: result.errors,
         });
 
         // ── Stamp last sync time ───────────────────────────────────────────────

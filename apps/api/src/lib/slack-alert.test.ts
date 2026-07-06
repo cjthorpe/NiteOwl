@@ -4,9 +4,11 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import {
   formatPrMergeAlert,
+  formatSilentIngestionAlert,
   sendSlackAlert,
   SlackAlertError,
   type PrMergeAlertData,
+  type SilentIngestionAlertData,
 } from './slack-alert.js';
 
 // ---------------------------------------------------------------------------
@@ -96,6 +98,62 @@ describe('formatPrMergeAlert', () => {
   it('includes a divider block', () => {
     const msg = formatPrMergeAlert(prData);
     expect(msg.blocks.some((b) => b.type === 'divider')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatSilentIngestionAlert (FUL-145)
+// ---------------------------------------------------------------------------
+
+const silentData: SilentIngestionAlertData = {
+  provider: 'github',
+  source: 'repo_scan',
+  fetched: 405,
+  inserted: 0,
+  occurredAt: '2026-07-06T06:00:00Z',
+  traceId: '7f3c9a12',
+};
+
+describe('formatSilentIngestionAlert', () => {
+  it('headers with the provider and source', () => {
+    const msg = formatSilentIngestionAlert(silentData);
+    const header = msg.blocks.find((b) => b.type === 'header');
+    if (header?.type === 'header') {
+      expect(header.text.text).toContain('github');
+      expect(header.text.text).toContain('repo_scan');
+    }
+  });
+
+  it('states the fetched and inserted counts in the section body', () => {
+    const msg = formatSilentIngestionAlert(silentData);
+    const section = msg.blocks.find((b) => b.type === 'section');
+    if (section?.type === 'section') {
+      expect(section.text.text).toContain('405');
+      expect(section.text.text).toContain('*0*');
+    }
+  });
+
+  it('sets fallback text describing the blackout', () => {
+    const msg = formatSilentIngestionAlert(silentData);
+    expect(msg.text).toContain('Silent ingestion failure');
+    expect(msg.text).toContain('github/repo_scan');
+  });
+
+  it('surfaces the traceId in the context block when present', () => {
+    const msg = formatSilentIngestionAlert(silentData);
+    const context = msg.blocks.find((b) => b.type === 'context');
+    if (context?.type === 'context') {
+      expect(context.elements.some((e) => e.text.includes('7f3c9a12'))).toBe(true);
+    }
+  });
+
+  it('omits the trace segment when no traceId is provided', () => {
+    const { traceId: _omit, ...noTrace } = silentData;
+    const msg = formatSilentIngestionAlert(noTrace);
+    const context = msg.blocks.find((b) => b.type === 'context');
+    if (context?.type === 'context') {
+      expect(context.elements.some((e) => e.text.includes('trace'))).toBe(false);
+    }
   });
 });
 

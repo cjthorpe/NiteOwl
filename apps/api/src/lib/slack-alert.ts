@@ -26,6 +26,21 @@ export interface PrMergeAlertData {
   occurredAt: string; // ISO 8601
 }
 
+/**
+ * Payload for a silent-ingestion alert (FUL-145): a run pulled items from the
+ * provider but persisted none of them (`fetched>0 && inserted==0`) — the FUL-98
+ * failure class that previously vanished into the logs.
+ */
+export interface SilentIngestionAlertData {
+  provider: string; // github | linear | jira
+  source: string; // repo_scan | catchup | briefing | post_login
+  fetched: number;
+  inserted: number;
+  occurredAt: string; // ISO 8601
+  /** Per-run correlation id to cross-reference the structured span logs. */
+  traceId?: string;
+}
+
 /** Minimal Slack Block Kit message shape for an Incoming Webhook. */
 export interface SlackMessage {
   text: string;
@@ -120,6 +135,60 @@ export function formatPrMergeAlert(data: PrMergeAlertData): SlackMessage {
           {
             type: 'mrkdwn',
             text: `NiteOwl Alert · ${ts}`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Builds a Slack Block Kit message for a silent-ingestion blackout (FUL-145).
+ *
+ * Example render:
+ *   🚨 Silent ingestion failure — github / repo_scan
+ *   ─────────────────────────────────────────────────
+ *   Fetched *405* items but inserted *0*.
+ *   trace: 7f3c…  ·  6 Jul 2026
+ */
+export function formatSilentIngestionAlert(data: SilentIngestionAlertData): SlackMessage {
+  const ts = new Date(data.occurredAt).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const fallbackText = `Silent ingestion failure on ${data.provider}/${data.source}: fetched ${data.fetched} but inserted ${data.inserted}`;
+
+  const contextText = data.traceId
+    ? `NiteOwl Alert · trace ${escapeMarkdown(data.traceId)} · ${ts}`
+    : `NiteOwl Alert · ${ts}`;
+
+  return {
+    text: fallbackText,
+    blocks: [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: `🚨 Silent ingestion failure — ${data.provider} / ${data.source}`,
+          emoji: true,
+        },
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `Fetched *${data.fetched}* item(s) from *${escapeMarkdown(data.provider)}* but inserted *${data.inserted}*.\nThis is the FUL-98 blackout class — activity is being pulled but never lands on the board.`,
+        },
+      },
+      { type: 'divider' },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: contextText,
           },
         ],
       },

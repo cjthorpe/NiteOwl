@@ -23,6 +23,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     normalizationQueue: Queue<NormalizationJobData> | null;
     slackAlertQueue: Queue<SlackAlertJobData> | null;
+    overnightCatchupQueue: Queue<OvernightCatchupJobData> | null;
   }
 }
 
@@ -196,6 +197,8 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (fastify, { db
 
   fastify.decorate('normalizationQueue', normalizationQueue);
   fastify.decorate('slackAlertQueue', slackAlertQueue);
+  // Exposed so the /metrics scrape can sample ingestion queue depth (FUL-145).
+  fastify.decorate('overnightCatchupQueue', overnightCatchupQueue);
 };
 
 export default fp(queuePlugin, { name: 'queue', dependencies: [] });
