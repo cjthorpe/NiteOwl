@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@bull-board/api": "^5.20.0",
+    "@bull-board/api": "^8.1.2",
     "@bull-board/fastify": "^5.20.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",

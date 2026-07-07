@@ -47,8 +47,8 @@ importers:
   apps/api:
     dependencies:
       '@bull-board/api':
-        specifier: ^5.20.0
-        version: 5.23.0(@bull-board/ui@5.23.0)
+        specifier: ^8.1.2
+        version: 8.1.2(@bull-board/ui@8.1.2)
       '@bull-board/fastify':
         specifier: ^5.20.0
         version: 5.23.0
@@ -339,11 +339,19 @@ packages:
     peerDependencies:
       '@bull-board/ui': 5.23.0
 
+  '@bull-board/api@8.1.2':
+    resolution: {integrity: sha512-6NGYCIRhHJmmoCwAFA1z4lPpR/D/BdOjyERd2MMeG4Samu05FSjzKKdN55S3ga30EcXeENfYzmNn6IDmVz5OTg==}
+    peerDependencies:
+      '@bull-board/ui': 8.1.2
+
   '@bull-board/fastify@5.23.0':
     resolution: {integrity: sha512-woCnCAav4IByuo05D13MZtETzZp0ej1y0R+6IY33pqLKDRKa6Dor6OMx1l6/nMc/wXeng4SXC5rnrAck7Py70w==}
 
   '@bull-board/ui@5.23.0':
     resolution: {integrity: sha512-iI/Ssl8T5ZEn9s899Qz67m92M6RU8thf/aqD7cUHB2yHmkCjqbw7s7NaODTsyArAsnyu7DGJMWm7EhbfFXDNgQ==}
+
+  '@bull-board/ui@8.1.2':
+    resolution: {integrity: sha512-gC5u9XUSiRile4/VC+WHXtaPvfZV4Mrrz8MSvPe32Hjl2MXStfSuEOb+9Tw/WMpNSZ442tGpFZLz0RDh1Yo3jg==}
 
   '@csstools/color-helpers@5.1.0':
     resolution: {integrity: sha512-S11EXWJyy0Mz5SYvRmY8nJYTFFd1LCNV+7cXyAgQtOOuzb4EsgfqDufL+9esx72/eLhsRdGZwaldu/h+E4t4BA==}
@@ -3251,6 +3259,11 @@ snapshots:
       '@bull-board/ui': 5.23.0
       redis-info: 3.1.0
 
+  '@bull-board/api@8.1.2(@bull-board/ui@8.1.2)':
+    dependencies:
+      '@bull-board/ui': 8.1.2
+      redis-info: 3.1.0
+
   '@bull-board/fastify@5.23.0':
     dependencies:
       '@bull-board/api': 5.23.0(@bull-board/ui@5.23.0)
@@ -3262,6 +3275,10 @@ snapshots:
   '@bull-board/ui@5.23.0':
     dependencies:
       '@bull-board/api': 5.23.0(@bull-board/ui@5.23.0)
+
+  '@bull-board/ui@8.1.2':
+    dependencies:
+      '@bull-board/api': 8.1.2(@bull-board/ui@8.1.2)
 
   '@csstools/color-helpers@5.1.0': {}
 
