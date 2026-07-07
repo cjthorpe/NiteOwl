@@ -113,7 +113,7 @@ export function ResetPasswordPage() {
 
     if (result.ok) {
       // Hand the success notice to the login screen and route there.
-      navigate('/login', { replace: true, state: { notice: result.message } });
+      void navigate('/login', { replace: true, state: { notice: result.message } });
       return;
     }
 
