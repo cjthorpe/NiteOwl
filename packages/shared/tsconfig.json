@@ -3,7 +3,12 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "composite": true
+    "composite": true,
+    // `licence.ts` / `licence.test.ts` use `node:crypto` and `Buffer`. TS <6
+    // resolved these ambient Node globals implicitly from the hoisted
+    // @types/node; TS 6 no longer does and errors with TS2591. Pin the Node
+    // type package explicitly so the build is version-independent (FUL-149).
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
