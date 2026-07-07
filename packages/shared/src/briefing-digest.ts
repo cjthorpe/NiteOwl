@@ -52,12 +52,7 @@ export interface BriefingDigestInput {
 }
 
 export type BriefingHighlightKind =
-  | 'needs_review'
-  | 'merged'
-  | 'top_mover'
-  | 'issues'
-  | 'commits'
-  | 'providers';
+  'needs_review' | 'merged' | 'top_mover' | 'issues' | 'commits' | 'providers';
 
 export interface BriefingHighlight {
   kind: BriefingHighlightKind;

@@ -179,8 +179,7 @@ export function buildApp(opts: BuildAppOptions = {}) {
       ? ((
           app as unknown as {
             normalizationQueue:
-              | import('bullmq').Queue<import('@niteowl/types').NormalizationJobData>
-              | null;
+              import('bullmq').Queue<import('@niteowl/types').NormalizationJobData> | null;
           }
         ).normalizationQueue ?? undefined)
       : undefined;
