@@ -79,7 +79,7 @@ export function OAuthCallbackPage() {
   useEffect(() => {
     if (callbackStatus !== 'success') return;
     const timer = setTimeout(() => {
-      navigate('/onboarding', { replace: true });
+      void navigate('/onboarding', { replace: true });
     }, 1800);
     return () => clearTimeout(timer);
   }, [callbackStatus, navigate]);
@@ -106,7 +106,7 @@ export function OAuthCallbackPage() {
           <ErrorState
             message={errorMessage ?? 'Something went wrong.'}
             {...(isValidProvider(provider) ? { provider } : {})}
-            onRetry={() => navigate('/onboarding')}
+            onRetry={() => void navigate('/onboarding')}
           />
         )}
       </div>

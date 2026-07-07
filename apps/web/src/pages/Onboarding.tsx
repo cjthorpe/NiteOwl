@@ -38,7 +38,9 @@ export function Onboarding() {
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-16">
         <div className="w-full max-w-lg">
           {step === 1 && <StepConnectGitHub />}
-          {step === 2 && <StepOptionalIntegrations onContinue={() => navigate('/dashboard')} />}
+          {step === 2 && (
+            <StepOptionalIntegrations onContinue={() => void navigate('/dashboard')} />
+          )}
         </div>
       </main>
     </div>
