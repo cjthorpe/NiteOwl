@@ -13,11 +13,24 @@ updates:
       include: scope
     groups:
       # Batch low-risk dev tooling bumps into a single PR to cut noise.
+      # Majors are deliberately EXCLUDED (update-types below): a grouped PR that
+      # silently bundles a major bump is unmergeable — a single breaking package
+      # (e.g. typescript 6 / eslint 10 flat-config) fails CI for the whole batch
+      # and cannot be squashed without dropping the safe bumps too (FUL-149).
+      # Majors fall out of the group and get their own individual, reviewable PR
+      # so each migration can be verified and landed on its own.
       dev-dependencies:
         dependency-type: development
-      # Keep production dependency bumps separate for closer review.
+        update-types:
+          - minor
+          - patch
+      # Keep production dependency bumps separate for closer review. Same
+      # major-exclusion rationale as above applies here too.
       production-dependencies:
         dependency-type: production
+        update-types:
+          - minor
+          - patch
 
   # GitHub Actions used in CI/CD workflows.
   - package-ecosystem: github-actions
