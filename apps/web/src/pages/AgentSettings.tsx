@@ -152,12 +152,12 @@ function IntegrationSection({
                   transition: `color var(--duration-fast), border-color var(--duration-fast)`,
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-danger)';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-danger)';
+                  e.currentTarget.style.color = 'var(--color-danger)';
+                  e.currentTarget.style.borderColor = 'var(--color-danger)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--color-text-muted)';
+                  e.currentTarget.style.borderColor = 'transparent';
                 }}
               >
                 Remove
@@ -207,10 +207,10 @@ function IntegrationSection({
               boxSizing: 'border-box',
             }}
             onFocus={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--color-border-focus)';
+              e.currentTarget.style.borderColor = 'var(--color-border-focus)';
             }}
             onBlur={(e) => {
-              (e.currentTarget as HTMLInputElement).style.borderColor = localError
+              e.currentTarget.style.borderColor = localError
                 ? 'var(--color-danger)'
                 : 'var(--color-border)';
             }}

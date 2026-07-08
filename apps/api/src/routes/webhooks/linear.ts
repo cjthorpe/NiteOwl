@@ -38,7 +38,7 @@ export const linearWebhookRoutes: FastifyPluginAsync<{ db: Db }> = async (fastif
   // the raw Buffer. This is required because HMAC verification must run on the
   // exact bytes sent by Linear — re-serialising the parsed object would differ.
   fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
-    done(null, body as Buffer);
+    done(null, body);
   });
 
   fastify.post<{ Body: Buffer }>(

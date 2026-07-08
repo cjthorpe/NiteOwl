@@ -42,7 +42,7 @@ export const jiraWebhookRoutes: FastifyPluginAsync<{ db: Db }> = async (fastify,
   // Override the JSON content-type parser for this plugin scope so we receive
   // the raw Buffer. This is required for idempotency hashing of the exact bytes.
   fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
-    done(null, body as Buffer);
+    done(null, body);
   });
 
   fastify.post<{

@@ -153,12 +153,12 @@ export function IntegrationCard({ meta, compact = false }: IntegrationCardProps)
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-danger)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-danger)';
+              e.currentTarget.style.color = 'var(--color-danger)';
+              e.currentTarget.style.borderColor = 'var(--color-danger)';
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border)';
+              e.currentTarget.style.color = 'var(--color-text-muted)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
             }}
           >
             Disconnect
@@ -175,12 +175,12 @@ export function IntegrationCard({ meta, compact = false }: IntegrationCardProps)
               border: 'none',
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.opacity = '0.88';
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              e.currentTarget.style.opacity = '0.88';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             Connect
