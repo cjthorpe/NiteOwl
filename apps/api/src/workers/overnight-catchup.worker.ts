@@ -202,8 +202,15 @@ export function createOvernightCatchupWorker(
             { webhookUrl },
           );
           console.info(
-            `${label} github user=${row.userId} integration=${row.integrationId} reposScanned=${result.reposScanned} ingested=${result.ingested} total=${result.total} errors=${result.errors}`,
+            `${label} github user=${row.userId} integration=${row.integrationId} reposScanned=${result.reposScanned} ingested=${result.ingested} total=${result.total} errors=${result.errors} requestsUsed=${result.requestsUsed} rateLimited=${result.rateLimited}`,
           );
+          // A rate-budgeted scan leaves repos unscanned (FUL-130): surface it so
+          // a persistently truncated large-org integration is visible, not silent.
+          if (result.rateLimited) {
+            console.warn(
+              `${label} github repo-scan truncated by rate budget integration=${row.integrationId} reposSkipped=${result.reposSkipped} requestsUsed=${result.requestsUsed}`,
+            );
+          }
           // Surface per-repo failures the scan isolated & counted rather than
           // letting them vanish: a bad repo is skipped-and-counted, not silently
           // dropped.

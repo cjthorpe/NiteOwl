@@ -57,6 +57,90 @@ export interface GitHubPullRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Rate budgeting + backpressure (FUL-130)
+// ---------------------------------------------------------------------------
+
+/**
+ * Default ceiling on GitHub REST requests issued by a single scan run. GitHub's
+ * authenticated REST budget is 5000 req/hour; a single integration's catch-up
+ * should never monopolise it, and a large org could otherwise fan out to
+ * thousands of requests (N repos × all commit/PR pages). 900 leaves ample
+ * headroom for webhooks and other integrations sharing the same token.
+ */
+export const DEFAULT_MAX_REQUESTS = 900;
+
+/**
+ * Stop issuing new requests once GitHub reports this few requests remaining in
+ * the current window. Proactive backpressure: we back off *before* exhausting
+ * the quota (which would 403 every other caller) rather than reacting to a 429.
+ */
+export const DEFAULT_MIN_REMAINING = 100;
+
+export interface RateBudgetOptions {
+  /** Hard cap on total GitHub requests per scan run. Defaults to {@link DEFAULT_MAX_REQUESTS}. */
+  maxRequests?: number;
+  /** Reserve floor on GitHub's reported remaining quota. Defaults to {@link DEFAULT_MIN_REMAINING}. */
+  minRemaining?: number;
+}
+
+/**
+ * Tracks request spend across a scan and decides when to apply backpressure.
+ *
+ * Two independent limits, whichever bites first:
+ *  - a per-run request cap (pagination budget), and
+ *  - GitHub's own `x-ratelimit-remaining`, observed from every response so we
+ *    stop before draining the shared token quota.
+ *
+ * Deliberately stateful (a spend counter is not meaningfully immutable); callers
+ * check {@link canSpend} before each request and read {@link throttled} after the
+ * run to distinguish a complete scan from a budget-truncated one.
+ */
+export class RateBudget {
+  readonly maxRequests: number;
+  readonly minRemaining: number;
+  private used = 0;
+  private remaining = Number.POSITIVE_INFINITY;
+  private throttledFlag = false;
+
+  constructor(options: RateBudgetOptions = {}) {
+    this.maxRequests = options.maxRequests ?? DEFAULT_MAX_REQUESTS;
+    this.minRemaining = options.minRemaining ?? DEFAULT_MIN_REMAINING;
+  }
+
+  /** Whether another request is permitted under both the run cap and GitHub's quota. */
+  canSpend(): boolean {
+    return this.used < this.maxRequests && this.remaining > this.minRemaining;
+  }
+
+  /** Records that a request is about to be issued. */
+  spend(): void {
+    this.used += 1;
+  }
+
+  /** Updates the observed remaining quota from a response's rate-limit header. */
+  observe(res: Response): void {
+    const header = res.headers.get('x-ratelimit-remaining');
+    if (header === null) return;
+    const value = Number.parseInt(header, 10);
+    if (!Number.isNaN(value)) this.remaining = value;
+  }
+
+  /** Marks that the budget forced early termination somewhere in the run. */
+  markThrottled(): void {
+    this.throttledFlag = true;
+  }
+
+  /** True when the run stopped short because a budget limit was reached. */
+  get throttled(): boolean {
+    return this.throttledFlag;
+  }
+
+  get requestsUsed(): number {
+    return this.used;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rate-limit helpers — exponential backoff on 429 / 403
 // ---------------------------------------------------------------------------
 
@@ -106,12 +190,43 @@ export function encodeRepoPath(repoFullName: string): string {
   return repoFullName.split('/').map(encodeURIComponent).join('/');
 }
 
-export async function fetchAllPages<T>(firstUrl: string, token: string): Promise<T[]> {
+export interface FetchAllPagesOptions<T> {
+  /** Shared budget; when exhausted, pagination stops and the budget is flagged throttled. */
+  budget?: RateBudget;
+  /** Per-call ceiling on pages followed. Defaults to unbounded (Link headers govern). */
+  maxPages?: number;
+  /**
+   * Early-termination predicate, evaluated after each page is collected. Return
+   * `true` to stop following `rel="next"`. Used to halt window-sorted endpoints
+   * (e.g. PRs sorted by `updated desc`) once a page falls entirely before the
+   * window, instead of paginating the whole repo history (FUL-130).
+   */
+  stopWhen?: (page: T[]) => boolean;
+}
+
+export async function fetchAllPages<T>(
+  firstUrl: string,
+  token: string,
+  options: FetchAllPagesOptions<T> = {},
+): Promise<T[]> {
+  const { budget, maxPages = Number.POSITIVE_INFINITY, stopWhen } = options;
   const results: T[] = [];
   let url: string | null = firstUrl;
+  let pages = 0;
 
   while (url !== null) {
+    if (pages >= maxPages) {
+      budget?.markThrottled();
+      break;
+    }
+    if (budget && !budget.canSpend()) {
+      budget.markThrottled();
+      break;
+    }
+
+    budget?.spend();
     const res = await fetchWithBackoff(url, token);
+    budget?.observe(res);
 
     if (!res.ok) {
       if (res.status === 404) break; // repo may have been deleted
@@ -120,6 +235,9 @@ export async function fetchAllPages<T>(firstUrl: string, token: string): Promise
 
     const page = (await res.json()) as T[];
     results.push(...page);
+    pages += 1;
+
+    if (stopWhen?.(page)) break;
 
     const link = res.headers.get('link') ?? '';
     const nextMatch = link.match(/<([^>]+)>;\s*rel="next"/);
@@ -155,6 +273,12 @@ export interface RepoScanOptions {
   config?: RepoAllowlistConfig | null;
   /** Optional logger for per-repo failures (one bad repo never aborts the run). */
   logger?: RepoScanLogger;
+  /**
+   * Pagination budgeting + backpressure for large orgs (FUL-130). Caps the
+   * requests a single scan issues and backs off before draining GitHub's quota.
+   * Omit to use {@link DEFAULT_MAX_REQUESTS} / {@link DEFAULT_MIN_REMAINING}.
+   */
+  rateBudget?: RateBudgetOptions;
 }
 
 export interface RepoScanResult {
@@ -167,6 +291,16 @@ export interface RepoScanResult {
   errors: number;
   /** Most recent per-repo error, if any — for caller-side logging. */
   lastError?: Error;
+  /**
+   * True when the run stopped short of scanning every eligible repo because the
+   * request budget or GitHub's remaining quota was exhausted (FUL-130). Callers
+   * should surface this — a truncated scan is not a complete one.
+   */
+  rateLimited: boolean;
+  /** Eligible repos left unscanned because the budget was reached. */
+  reposSkipped: number;
+  /** Total GitHub requests issued by the run. */
+  requestsUsed: number;
 }
 
 /**
@@ -180,10 +314,15 @@ export interface RepoScanResult {
 export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScanResult> {
   const { db, userId, integrationId, accessToken, since, until, config = null, logger } = opts;
 
+  // One budget spans the whole run: the repo listing, plus every repo's commit
+  // and PR pagination all draw from the same request allowance and GitHub quota.
+  const budget = new RateBudget(opts.rateBudget);
+
   // ── Fetch recently-pushed repos the token can see ────────────────────────
   const repos = await fetchAllPages<GitHubRepo>(
     'https://api.github.com/user/repos?sort=pushed&direction=desc&per_page=100',
     accessToken,
+    { budget },
   );
 
   // Only scan repos pushed within the window, and — when an allowlist is
@@ -196,9 +335,26 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
   const rows: Array<typeof schema.activityEvents.$inferInsert> = [];
   let errors = 0;
   let lastError: Error | undefined;
+  let reposScanned = 0;
+
+  // PRs come back sorted by `updated desc`, so once a page's oldest entry falls
+  // before the window every later page does too — stop paginating there instead
+  // of pulling the repo's entire PR history (FUL-130).
+  const prPageBeforeWindow = (page: GitHubPullRequest[]): boolean => {
+    const oldest = page[page.length - 1];
+    return oldest !== undefined && new Date(oldest.updated_at) < since;
+  };
 
   for (const repo of activeRepos) {
+    // Stop before the next repo once the budget/quota is spent rather than
+    // partially scanning a repo — the run reports the remainder as skipped.
+    if (!budget.canSpend()) {
+      budget.markThrottled();
+      break;
+    }
+
     const repoName = repo.full_name;
+    reposScanned += 1;
 
     // Commits within the window — captures every author, not just the user.
     try {
@@ -206,6 +362,7 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
         `https://api.github.com/repos/${encodeRepoPath(repoName)}/commits` +
           `?since=${since.toISOString()}&until=${until.toISOString()}&per_page=100`,
         accessToken,
+        { budget },
       );
 
       for (const commit of commits) {
@@ -247,6 +404,7 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
         `https://api.github.com/repos/${encodeRepoPath(repoName)}/pulls` +
           `?state=all&sort=updated&direction=desc&per_page=100`,
         accessToken,
+        { budget, stopWhen: prPageBeforeWindow },
       );
 
       for (const pr of prs) {
@@ -301,11 +459,22 @@ export async function runGitHubRepoScan(opts: RepoScanOptions): Promise<RepoScan
     ingested = inserted.length;
   }
 
+  const reposSkipped = activeRepos.length - reposScanned;
+  if (budget.throttled) {
+    logger?.warn(
+      { integrationId, reposScanned, reposSkipped, requestsUsed: budget.requestsUsed },
+      '[github-repo-scan] Rate budget reached — scan truncated',
+    );
+  }
+
   return {
-    reposScanned: activeRepos.length,
+    reposScanned,
     ingested,
     total: rows.length,
     errors,
+    rateLimited: budget.throttled,
+    reposSkipped,
+    requestsUsed: budget.requestsUsed,
     ...(lastError ? { lastError } : {}),
   };
 }
