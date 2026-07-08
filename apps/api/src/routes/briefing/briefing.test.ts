@@ -24,7 +24,9 @@ const redisMock = {
 };
 
 vi.mock('ioredis', () => {
-  const ctor = vi.fn().mockImplementation(() => redisMock);
+  const ctor = vi.fn().mockImplementation(function () {
+    return redisMock;
+  });
   return { default: ctor, Redis: ctor };
 });
 

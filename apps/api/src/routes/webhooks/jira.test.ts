@@ -31,7 +31,9 @@ const redisMock = {
 };
 
 vi.mock('ioredis', () => {
-  const ctor = vi.fn().mockImplementation(() => redisMock);
+  const ctor = vi.fn().mockImplementation(function () {
+    return redisMock;
+  });
   return { default: ctor, Redis: ctor };
 });
 
@@ -182,7 +184,9 @@ beforeEach(() => {
   process.env['JIRA_WEBHOOK_SECRET'] = SECRET;
 
   vi.resetAllMocks();
-  vi.mocked(Redis).mockImplementation(() => redisMock as never);
+  vi.mocked(Redis).mockImplementation(function () {
+    return redisMock as never;
+  });
 
   mockDb.select.mockReturnThis();
   mockDb.from.mockReturnThis();
