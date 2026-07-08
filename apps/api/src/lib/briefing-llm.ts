@@ -206,7 +206,7 @@ export async function enhanceBriefingWithLlm(
   if (input.totalItems === 0) return null;
 
   const baseline = buildBriefingDigest(input);
-  const fetchImpl = deps.fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
+  const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') return null;
 
   const controller = new AbortController();

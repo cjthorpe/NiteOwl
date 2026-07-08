@@ -20,7 +20,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     // In production this would route to an observability service.
-    // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 

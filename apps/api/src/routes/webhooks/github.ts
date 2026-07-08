@@ -160,7 +160,7 @@ export const githubWebhookRoutes: FastifyPluginAsync<GitHubWebhookOptions> = asy
   // Parse body as raw Buffer so we can verify the HMAC against the exact
   // bytes GitHub sent — re-serialising the parsed object would differ.
   fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
-    done(null, body as Buffer);
+    done(null, body);
   });
 
   fastify.post<{
