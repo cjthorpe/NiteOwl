@@ -2,7 +2,12 @@
 // SPDX-FileCopyrightText: 2026 Fullstack Forge
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { encodeRepoPath, runGitHubRepoScan } from './github-repo-scan.js';
+import {
+  encodeRepoPath,
+  fetchAllPages,
+  RateBudget,
+  runGitHubRepoScan,
+} from './github-repo-scan.js';
 
 // ---------------------------------------------------------------------------
 // Mock global fetch so tests never hit the network. Responses are routed by
@@ -349,6 +354,183 @@ describe('runGitHubRepoScan — multi-contributor ingestion', () => {
     expect(requestedUrls.some((u) => u.includes('/repos/cjthorpe/NiteOwl/commits'))).toBe(true);
     expect(requestedUrls.some((u) => u.includes('/repos/cjthorpe/NiteOwl/pulls'))).toBe(true);
     expect(requestedUrls.some((u) => u.includes('%2F'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FUL-130 — pagination budgeting + backpressure for large orgs
+// ---------------------------------------------------------------------------
+
+/** Response builder that supports arbitrary headers (Link, rate-limit, …). */
+function resp(body: unknown, opts: { status?: number; headers?: Record<string, string> } = {}) {
+  const status = opts.status ?? 200;
+  const headers = opts.headers ?? {};
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: String(status),
+    headers: { get: (key: string) => headers[key.toLowerCase()] ?? null },
+    json: async () => body,
+  } as unknown as Response;
+}
+
+function makePr(id: number, number: number, updatedAt: string) {
+  return {
+    id,
+    number,
+    title: `PR ${number}`,
+    html_url: `https://github.com/acme/app/pull/${number}`,
+    state: 'open' as const,
+    merged_at: null,
+    updated_at: updatedAt,
+    user: { login: 'someone' },
+    base: { ref: 'main' },
+  };
+}
+
+const scanArgs = (db: unknown, extra: Record<string, unknown> = {}) => ({
+  db: db as Parameters<typeof runGitHubRepoScan>[0]['db'],
+  userId: 'user-1',
+  integrationId: 'int-1',
+  accessToken: 'ghp_test',
+  since: SINCE,
+  until: UNTIL,
+  ...extra,
+});
+
+describe('RateBudget', () => {
+  it('caps spending at maxRequests', () => {
+    const budget = new RateBudget({ maxRequests: 2 });
+    expect(budget.canSpend()).toBe(true);
+    budget.spend();
+    expect(budget.canSpend()).toBe(true);
+    budget.spend();
+    expect(budget.canSpend()).toBe(false);
+    expect(budget.requestsUsed).toBe(2);
+  });
+
+  it('applies backpressure once GitHub reports remaining quota at/below the floor', () => {
+    const budget = new RateBudget({ minRemaining: 100 });
+    expect(budget.canSpend()).toBe(true);
+    budget.observe(resp([], { headers: { 'x-ratelimit-remaining': '50' } }));
+    expect(budget.canSpend()).toBe(false);
+  });
+
+  it('ignores a missing or non-numeric rate-limit header', () => {
+    const budget = new RateBudget();
+    budget.observe(resp([], {}));
+    budget.observe(resp([], { headers: { 'x-ratelimit-remaining': 'nonsense' } }));
+    expect(budget.canSpend()).toBe(true);
+  });
+});
+
+describe('fetchAllPages — budgeting', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('follows at most maxPages Link headers and flags the budget throttled', async () => {
+    mockFetch.mockImplementation(async () =>
+      resp([{ n: 1 }], { headers: { link: '<https://api.github.com/next>; rel="next"' } }),
+    );
+    const budget = new RateBudget();
+    const items = await fetchAllPages<{ n: number }>('https://api.github.com/first', 'tok', {
+      budget,
+      maxPages: 2,
+    });
+    expect(items).toHaveLength(2); // one item per page, capped at 2 pages
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(budget.throttled).toBe(true);
+  });
+
+  it('stops early when stopWhen returns true, without following the next page', async () => {
+    mockFetch.mockImplementation(async () =>
+      resp([{ n: 1 }], { headers: { link: '<https://api.github.com/next>; rel="next"' } }),
+    );
+    const items = await fetchAllPages<{ n: number }>('https://api.github.com/first', 'tok', {
+      stopWhen: () => true,
+    });
+    expect(items).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runGitHubRepoScan — rate budgeting (FUL-130)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('stops PR pagination once a page falls entirely before the window', async () => {
+    const beforeWindow = '2026-06-20T00:00:00Z';
+    const page2Url = 'https://api.github.com/repos/acme/app/pulls?page=2';
+
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/user/repos')) {
+        return resp([{ id: 1, full_name: 'acme/app', html_url: 'https://x', pushed_at: inWindow }]);
+      }
+      if (url.includes('/commits')) return resp([]);
+      if (url === page2Url) return resp([makePr(99, 99, beforeWindow)]); // must never run
+      if (url.includes('/pulls')) {
+        // Newest-first: one in-window PR, then one before the window → stop here.
+        return resp([makePr(10, 1, inWindow), makePr(11, 2, beforeWindow)], {
+          headers: { link: `<${page2Url}>; rel="next"` },
+        });
+      }
+      return resp([]);
+    });
+
+    const { db } = makeDb();
+    const result = await runGitHubRepoScan(scanArgs(db));
+
+    expect(result.ingested).toBe(1); // only the in-window PR
+    expect(result.rateLimited).toBe(false);
+    const urls = mockFetch.mock.calls.map((c) => c[0] as string);
+    expect(urls).not.toContain(page2Url);
+  });
+
+  it('stops scanning further repos once the request cap is reached and reports the remainder', async () => {
+    routeFetch({
+      repos: [
+        { id: 1, full_name: 'acme/a', html_url: 'https://x', pushed_at: inWindow },
+        { id: 2, full_name: 'acme/b', html_url: 'https://x', pushed_at: inWindow },
+        { id: 3, full_name: 'acme/c', html_url: 'https://x', pushed_at: inWindow },
+      ],
+      commits: { 'acme/a': [makeCommit('a1', 'Paperclip')] },
+    });
+
+    const { db } = makeDb();
+    // Budget: /user/repos (1) + repo a commits (2) + repo a pulls (3) = cap hit.
+    const result = await runGitHubRepoScan(scanArgs(db, { rateBudget: { maxRequests: 3 } }));
+
+    expect(result.rateLimited).toBe(true);
+    expect(result.reposScanned).toBe(1);
+    expect(result.reposSkipped).toBe(2);
+    expect(result.requestsUsed).toBe(3);
+  });
+
+  it('backs off before draining the quota when remaining drops below the floor', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/user/repos')) {
+        return resp(
+          [
+            { id: 1, full_name: 'acme/a', html_url: 'https://x', pushed_at: inWindow },
+            { id: 2, full_name: 'acme/b', html_url: 'https://x', pushed_at: inWindow },
+          ],
+          { headers: { 'x-ratelimit-remaining': '5000' } },
+        );
+      }
+      // Every repo request reports a near-exhausted quota → backpressure engages.
+      if (url.includes('/commits')) {
+        return resp([makeCommit('a1', 'Paperclip')], {
+          headers: { 'x-ratelimit-remaining': '50' },
+        });
+      }
+      return resp([], { headers: { 'x-ratelimit-remaining': '50' } });
+    });
+
+    const warn = vi.fn();
+    const { db } = makeDb();
+    const result = await runGitHubRepoScan(scanArgs(db, { logger: { warn } }));
+
+    expect(result.rateLimited).toBe(true);
+    expect(result.reposScanned).toBeLessThan(2);
+    expect(warn).toHaveBeenCalled();
   });
 });
 
