@@ -27,52 +27,40 @@ export function OAuthCallbackPage() {
   const errorCode = searchParams.get('error');
   const eventCountParam = searchParams.get('event_count');
 
-  const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // The outcome is derived from the URL params set by the API redirect. Every
+  // path except `success` resolves synchronously, so we seed state from a pure
+  // derivation rather than syncing it inside the effect
+  // (react-hooks/set-state-in-effect). The success path stays 'loading' until
+  // the async token exchange below resolves.
+  const initialOutcome = deriveCallbackOutcome(provider, status, errorCode);
+  const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>(initialOutcome.status);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialOutcome.message);
 
   // Prevent double-processing in StrictMode
   const processed = useRef(false);
 
   useEffect(() => {
+    // Only the success path needs asynchronous work; synchronous error / unknown
+    // outcomes are already reflected in the initial state above.
+    if (initialOutcome.status !== 'loading') return;
     if (processed.current) return;
     processed.current = true;
 
-    if (!isValidProvider(provider)) {
-      setErrorMessage('Unknown integration provider.');
-      setCallbackStatus('error');
-      return;
-    }
+    const eventCount = Number(eventCountParam) || 0;
 
-    if (status === 'error' || errorCode) {
-      const msg = mapErrorCode(errorCode);
-      setErrorMessage(msg);
-      setCallbackStatus('error');
-      return;
-    }
+    // Exchange the HttpOnly refresh cookie (set by the API callback) for a
+    // short-lived JWT access token.  This is required for all protected API
+    // calls; without it every request gets a 401.
+    void refreshAccessToken().then((token) => {
+      if (!token) {
+        setErrorMessage('Session could not be established. Please try again.');
+        setCallbackStatus('error');
+        return;
+      }
 
-    if (status === 'success') {
-      const eventCount = Number(eventCountParam) || 0;
-
-      // Exchange the HttpOnly refresh cookie (set by the API callback) for a
-      // short-lived JWT access token.  This is required for all protected API
-      // calls; without it every request gets a 401.
-      void refreshAccessToken().then((token) => {
-        if (!token) {
-          setErrorMessage('Session could not be established. Please try again.');
-          setCallbackStatus('error');
-          return;
-        }
-
-        connect(provider, eventCount);
-        setCallbackStatus('success');
-      });
-
-      return;
-    }
-
-    // No recognisable params — treat as error
-    setErrorMessage('The connection could not be completed. Please try again.');
-    setCallbackStatus('error');
+      connect(provider as ActivityProvider, eventCount);
+      setCallbackStatus('success');
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-navigate after showing the success state briefly
@@ -245,6 +233,31 @@ function ErrorState({
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Derive the synchronous callback outcome from the redirect's URL params.
+ * The `success` case returns `loading` because it still needs an async token
+ * exchange; every other case resolves immediately.
+ */
+function deriveCallbackOutcome(
+  provider: string | null,
+  status: string | null,
+  errorCode: string | null,
+): { status: CallbackStatus; message: string | null } {
+  if (!isValidProvider(provider)) {
+    return { status: 'error', message: 'Unknown integration provider.' };
+  }
+  if (status === 'error' || errorCode) {
+    return { status: 'error', message: mapErrorCode(errorCode) };
+  }
+  if (status === 'success') {
+    return { status: 'loading', message: null };
+  }
+  return {
+    status: 'error',
+    message: 'The connection could not be completed. Please try again.',
+  };
+}
 
 function mapErrorCode(code: string | null): string {
   switch (code) {
