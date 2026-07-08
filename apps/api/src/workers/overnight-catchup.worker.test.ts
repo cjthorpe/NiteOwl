@@ -19,20 +19,23 @@ let capturedProcessor: ((job: { id?: string }) => Promise<void>) | null = null;
 
 vi.mock('bullmq', () => {
   return {
-    Worker: vi
-      .fn()
-      .mockImplementation((_queue: string, processor: (job: { id?: string }) => Promise<void>) => {
-        capturedProcessor = processor;
-        return {
-          on: vi.fn(),
-          close: vi.fn().mockResolvedValue(undefined),
-        };
-      }),
-    Queue: vi.fn().mockImplementation(() => ({
-      add: vi.fn().mockResolvedValue({ id: 'test-job-id' }),
-      close: vi.fn().mockResolvedValue(undefined),
-      upsertJobScheduler: vi.fn().mockResolvedValue(undefined),
-    })),
+    Worker: vi.fn().mockImplementation(function (
+      _queue: string,
+      processor: (job: { id?: string }) => Promise<void>,
+    ) {
+      capturedProcessor = processor;
+      return {
+        on: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+    }),
+    Queue: vi.fn().mockImplementation(function () {
+      return {
+        add: vi.fn().mockResolvedValue({ id: 'test-job-id' }),
+        close: vi.fn().mockResolvedValue(undefined),
+        upsertJobScheduler: vi.fn().mockResolvedValue(undefined),
+      };
+    }),
   };
 });
 

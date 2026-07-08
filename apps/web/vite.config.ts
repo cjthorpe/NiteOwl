@@ -17,7 +17,7 @@ export default defineConfig({
     target: 'esnext',
   },
   optimizeDeps: {
-    esbuildOptions: {
+    rolldownOptions: {
       target: 'esnext',
     },
   },

@@ -36,7 +36,9 @@ const redisMock = {
 };
 
 vi.mock('ioredis', () => {
-  const ctor = vi.fn().mockImplementation(() => redisMock);
+  const ctor = vi.fn().mockImplementation(function () {
+    return redisMock;
+  });
   return { default: ctor, Redis: ctor };
 });
 
@@ -166,7 +168,9 @@ describe('POST /api/webhooks/linear', () => {
 
     // vi.resetAllMocks() clears the ioredis constructor implementation too.
     // Re-apply it so new Redis() still returns redisMock.
-    vi.mocked(Redis).mockImplementation(() => redisMock as never);
+    vi.mocked(Redis).mockImplementation(function () {
+      return redisMock as never;
+    });
 
     // Re-apply default chainable implementations after the reset.
     // values() returns `this` so that .onConflictDoNothing() can be chained.
