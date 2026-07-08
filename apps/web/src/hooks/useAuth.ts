@@ -33,14 +33,16 @@ export function useAuth(): { isAuthenticated: boolean; isLoading: boolean } {
   const [isLoading, setIsLoading] = useState(() => !hasValidToken());
 
   useEffect(() => {
-    if (hasValidToken()) {
-      setIsAuthenticated(true);
-      setIsLoading(false);
-      return;
-    }
+    // A valid token is already reflected in the initial state (isAuthenticated =
+    // true, isLoading = false), so there's nothing to synchronise here — writing
+    // it back synchronously would just trigger a redundant re-render
+    // (react-hooks/set-state-in-effect).
+    if (hasValidToken()) return;
+
     // No token, or it has expired / is expiring — attempt a silent refresh via
     // the HttpOnly cookie.  This re-establishes the session after a page reload
-    // or when the 1-hour access token has expired.
+    // or when the 1-hour access token has expired. The async resolution below is
+    // outside the synchronous effect body, so it doesn't cascade renders.
     void refreshAccessToken().then((token) => {
       setIsAuthenticated(!!token);
       setIsLoading(false);

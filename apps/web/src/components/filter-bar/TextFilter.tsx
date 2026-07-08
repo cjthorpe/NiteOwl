@@ -28,14 +28,24 @@ export function TextFilter({
 }: TextFilterProps) {
   const inputId = useId();
   const [draft, setDraft] = useState(value);
-  const onCommitRef = useRef(onCommit);
-  onCommitRef.current = onCommit;
 
-  // Keep the draft in sync when the committed value changes externally
-  // (e.g. chip removal or "Clear all").
-  useEffect(() => {
+  // Keep the draft in sync when the committed value changes externally (e.g. chip
+  // removal or "Clear all"). Adjusting state during render off a previous-value
+  // tracker is the React-recommended alternative to a setState-in-effect sync:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [committedValue, setCommittedValue] = useState(value);
+  if (value !== committedValue) {
+    setCommittedValue(value);
     setDraft(value);
-  }, [value]);
+  }
+
+  // Latest-callback ref so the debounced commit always fires the current
+  // `onCommit` without re-arming the timer when the parent passes a new closure.
+  // Written in an effect (not during render) per react-hooks/refs.
+  const onCommitRef = useRef(onCommit);
+  useEffect(() => {
+    onCommitRef.current = onCommit;
+  }, [onCommit]);
 
   // Debounced commit: fire only when the draft diverges from the committed value.
   useEffect(() => {

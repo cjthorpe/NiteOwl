@@ -12,7 +12,7 @@
  */
 
 import type { ActivityProvider } from '@niteowl/types';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useRepoAllowlist } from '../../hooks/useRepoAllowlist';
 import {
@@ -54,11 +54,16 @@ export function RepoAllowlistControl({ provider = 'github' }: RepoAllowlistContr
     [integration?.repoAllowlist],
   );
 
-  useEffect(() => {
+  // Reset the working copy whenever the server value changes (record swap or a
+  // fresh allowlist). Adjusting state during render off a previous-value tracker
+  // replaces a setState-in-effect sync:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const serverKey = `${integration?.id ?? ''} ${serverAllowlist.join(' ')}`;
+  const [prevServerKey, setPrevServerKey] = useState<string | null>(null);
+  if (serverKey !== prevServerKey) {
+    setPrevServerKey(serverKey);
     setEntries(normalizeAllowlist(serverAllowlist));
-    // serverAllowlist identity changes only when the hook updates the record.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [integration?.id, serverAllowlist.join(' ')]);
+  }
 
   const dirty = useMemo(
     () => !allowlistsEqual(entries, serverAllowlist),

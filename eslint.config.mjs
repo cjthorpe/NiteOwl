@@ -10,9 +10,11 @@
  *     `import/no-unresolved` stays OFF: tsc already resolves every import during
  *     `pnpm typecheck`, and enabling it would pull in a native resolver binary
  *     that is awkward to build in CI.
- *   - react + react-hooks for the web app (wrapped with @eslint/compat's
- *     fixupPluginRules so the pre-flat-config plugins run on ESLint 10 without
- *     bumping them — react-hooks intentionally stays on v4 per FUL-151).
+ *   - react (pre-flat-config, wrapped with @eslint/compat's fixupPluginRules
+ *     so it runs on ESLint 10 without bumping) plus react-hooks v7, which is
+ *     flat-config native (no fixup shim) and turns on the React Compiler rule
+ *     set — refs-during-render, set-state-in-effect, immutability, purity, …
+ *     — as errors by default. See FUL-153.
  *   - eslint-config-prettier last, to disable stylistic rules Prettier owns.
  *
  * The open-core import-boundary guard remains a standalone config
@@ -109,7 +111,8 @@ export default tseslint.config(
     files: ['apps/web/**/*.{ts,tsx}'],
     plugins: {
       react: fixupPluginRules(react),
-      'react-hooks': fixupPluginRules(reactHooks),
+      // react-hooks v7 ships a flat-config-native plugin; no compat shim.
+      'react-hooks': reactHooks,
     },
     languageOptions: {
       globals: { ...globals.browser },
@@ -119,7 +122,8 @@ export default tseslint.config(
     },
     rules: {
       ...react.configs.flat.recommended.rules,
-      // react-hooks v4 predates flat-config exports; reference its rule set directly.
+      // react-hooks v7 recommended = rules-of-hooks + exhaustive-deps + the
+      // React Compiler rule set. Flat config object; spread its rules.
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
     },
