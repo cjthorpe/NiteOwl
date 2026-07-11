@@ -162,6 +162,10 @@ export const activityEvents = pgTable(
     ),
     // Idempotent ingestion: same external event per integration never inserted twice.
     unique('activity_events_integration_external_uniq').on(table.integrationId, table.externalId),
+    // Retention sweep (FUL-132) deletes WHERE ingested_at < cutoff; this lets the
+    // planner range-scan rather than seq-scan the table. Also serves the
+    // ingested_at last-login windows introduced in FUL-142.
+    index('activity_events_ingested_at_idx').on(table.ingestedAt),
   ],
 );
 
@@ -262,6 +266,8 @@ export const webhookEvents = pgTable(
     unique('webhook_events_provider_hash_uniq').on(table.provider, table.payloadHash),
     // Also deduplicate by provider delivery ID when present.
     index('webhook_events_delivery_id_idx').on(table.provider, table.deliveryId),
+    // Retention sweep (FUL-132) deletes WHERE received_at < cutoff.
+    index('webhook_events_received_at_idx').on(table.receivedAt),
   ],
 );
 

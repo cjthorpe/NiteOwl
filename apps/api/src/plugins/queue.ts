@@ -13,6 +13,11 @@ import {
   createOvernightCatchupWorker,
   type OvernightCatchupJobData,
 } from '../workers/overnight-catchup.worker.js';
+import {
+  EVENT_RETENTION_QUEUE,
+  createRetentionWorker,
+  type EventRetentionJobData,
+} from '../workers/retention.worker.js';
 import { SLACK_ALERT_QUEUE, createSlackAlertWorker } from '../workers/slack-alert.worker.js';
 
 // ---------------------------------------------------------------------------
@@ -56,6 +61,20 @@ function parseCatchupHour(): number {
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23 ? parsed : 6;
 }
 
+/**
+ * UTC hour for the daily event-retention sweep (FUL-132).
+ *
+ * Reads `RETENTION_HOUR_UTC` (default 4 → 04:00 UTC). Offset from the overnight
+ * catch-up (06:00) so the two nightly jobs don't contend. Out-of-range values
+ * fall back to the default.
+ */
+function parseRetentionHour(): number {
+  const raw = process.env['RETENTION_HOUR_UTC'];
+  if (!raw) return 4;
+  const parsed = parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23 ? parsed : 4;
+}
+
 // ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
@@ -84,6 +103,12 @@ export interface QueuePluginOptions {
  *  - 3 attempts with fixed 5-minute delay between retries
  *  - Completed jobs retained for the last 30 entries (one month at daily cadence)
  *  - Failed jobs retained for the last 90 entries
+ *
+ * Event-retention queue (FUL-132):
+ *  - Repeating job registered at startup via upsertJobScheduler (idempotent)
+ *  - Fires daily at RETENTION_HOUR_UTC:00 UTC (default 04:00, offset from catch-up)
+ *  - Deletes activity_events / webhook_events older than their configured window
+ *  - 3 attempts with fixed 5-minute delay; deletion is idempotent so retries are safe
  *
  * All queues are exposed on the Fastify instance where routes need to enqueue
  * jobs. A null value indicates Redis was unavailable at startup — handlers must
@@ -171,6 +196,43 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (fastify, { db
       );
     });
 
+  // ── Event-retention queue (FUL-132) ───────────────────────────────────────
+  // Nightly sweep that deletes expired activity_events / webhook_events. Same
+  // retry posture as overnight catch-up: a transient failure at the scheduled
+  // hour retries rather than silently skipping a day. Deletion is idempotent, so
+  // retries never over-delete.
+  const eventRetentionQueue = new Queue<EventRetentionJobData>(EVENT_RETENTION_QUEUE, {
+    connection: redisOptions,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'fixed' as const, delay: 5 * 60_000 }, // 5 min
+      removeOnComplete: { count: 30 },
+      removeOnFail: { count: 90 },
+    },
+  });
+
+  const retentionHour = parseRetentionHour();
+  const retentionCron = `0 ${retentionHour} * * *`;
+
+  void eventRetentionQueue
+    .upsertJobScheduler(
+      'event-retention-daily',
+      { pattern: retentionCron },
+      { name: 'run', data: {} },
+    )
+    .then(() => {
+      fastify.log.info(
+        { retentionCron, retentionHour },
+        '[event-retention] daily scheduler registered',
+      );
+    })
+    .catch((err: unknown) => {
+      fastify.log.error(
+        { err, retentionCron },
+        '[event-retention] scheduler registration failed — will retry on next healthy startup',
+      );
+    });
+
   // ── Workers ───────────────────────────────────────────────────────────────
 
   const normalizationWorker = createNormalizationWorker(db, redisOptions, slackAlertQueue);
@@ -179,12 +241,16 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (fastify, { db
 
   const overnightCatchupWorker = createOvernightCatchupWorker(db, redisOptions);
 
+  const eventRetentionWorker = createRetentionWorker(db, redisOptions);
+
   // ── Graceful shutdown ─────────────────────────────────────────────────────
 
   fastify.addHook('onClose', async () => {
+    await eventRetentionWorker.close().catch(() => undefined);
     await overnightCatchupWorker.close().catch(() => undefined);
     await slackAlertWorker.close().catch(() => undefined);
     await normalizationWorker.close().catch(() => undefined);
+    await eventRetentionQueue.close().catch(() => undefined);
     await overnightCatchupQueue.close().catch(() => undefined);
     await slackAlertQueue.close().catch(() => undefined);
     await normalizationQueue.close().catch(() => undefined);
@@ -192,7 +258,7 @@ const queuePlugin: FastifyPluginAsync<QueuePluginOptions> = async (fastify, { db
 
   fastify.log.info(
     { host: redisOptions.host, port: redisOptions.port },
-    'BullMQ normalization + slack-alert + overnight-catchup queues registered',
+    'BullMQ normalization + slack-alert + overnight-catchup + event-retention queues registered',
   );
 
   fastify.decorate('normalizationQueue', normalizationQueue);
