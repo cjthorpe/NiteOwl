@@ -6,6 +6,7 @@ import type { Activity, NormalizationJobData, SlackAlertJobData } from '@niteowl
 import type { Queue } from 'bullmq';
 import { Worker } from 'bullmq';
 
+import { attachDeadLetterHandler } from '../lib/dead-letter.js';
 import { normalizeEvent } from '../normalizers/index.js';
 import { invalidateFeedCache } from '../routes/feed/index.js';
 import { getEnabledAlertsForUser } from '../routes/slack-alerts/index.js';
@@ -157,6 +158,9 @@ export function createNormalizationWorker(
       error: err.message,
     });
   });
+
+  // Dead-letter alerting (FUL-131): fires once, only when a job exhausts retries.
+  attachDeadLetterHandler(worker, NORMALIZATION_QUEUE);
 
   return worker;
 }

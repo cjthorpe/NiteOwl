@@ -98,6 +98,13 @@ export const ingestionLagSeconds = new Gauge({
   registers: [register],
 });
 
+export const bullmqDeadLetterTotal = new Counter({
+  name: 'bullmq_dead_letter_total',
+  help: 'BullMQ jobs that exhausted every retry and were dead-lettered, by queue (FUL-131).',
+  labelNames: ['queue'],
+  registers: [register],
+});
+
 // ---------------------------------------------------------------------------
 // Silent-failure boundary
 // ---------------------------------------------------------------------------

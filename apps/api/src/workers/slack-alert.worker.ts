@@ -26,6 +26,7 @@ import type { SlackAlertJobData } from '@niteowl/types';
 import { Worker } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 
+import { attachDeadLetterHandler } from '../lib/dead-letter.js';
 import { formatPrMergeAlert, sendSlackAlert } from '../lib/slack-alert.js';
 
 export const SLACK_ALERT_QUEUE = 'slack-alert';
@@ -109,6 +110,9 @@ export function createSlackAlertWorker(
       `[slack-alert-worker] Job ${job.id ?? ''} completed for config ${job.data.configId}`,
     );
   });
+
+  // Dead-letter alerting (FUL-131): fires once, only when a job exhausts retries.
+  attachDeadLetterHandler(worker, SLACK_ALERT_QUEUE);
 
   return worker;
 }
