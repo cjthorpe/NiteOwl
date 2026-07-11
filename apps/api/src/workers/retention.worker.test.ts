@@ -14,9 +14,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let capturedProcessor: ((job: { id?: string }) => Promise<void>) | null = null;
 
 vi.mock('bullmq', () => ({
+  // Vitest 4 constructs mocks via Reflect.construct, so the implementation must
+  // be a regular function (not an arrow) to be usable behind `new Worker(...)`.
   Worker: vi
     .fn()
-    .mockImplementation((_queue: string, processor: (job: { id?: string }) => Promise<void>) => {
+    .mockImplementation(function (
+      _queue: string,
+      processor: (job: { id?: string }) => Promise<void>,
+    ) {
       capturedProcessor = processor;
       return { on: vi.fn(), close: vi.fn().mockResolvedValue(undefined) };
     }),
