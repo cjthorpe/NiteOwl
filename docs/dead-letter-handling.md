@@ -47,10 +47,10 @@ Wired into all three workers: `normalization`, `slack-alert`, and
 
 ## Observability
 
-| Signal | Where | Meaning |
-| --- | --- | --- |
-| `bullmq_dead_letter_total{queue}` | `/metrics` (Prometheus) | Rate/count of jobs that exhausted every retry. |
-| `ingestion_queue_depth{queue,state="failed"}` | `/metrics` | Current depth of each queue's failed (dead-letter) set. |
+| Signal                                         | Where                     | Meaning                                                             |
+| ---------------------------------------------- | ------------------------- | ------------------------------------------------------------------- |
+| `bullmq_dead_letter_total{queue}`              | `/metrics` (Prometheus)   | Rate/count of jobs that exhausted every retry.                      |
+| `ingestion_queue_depth{queue,state="failed"}`  | `/metrics`                | Current depth of each queue's failed (dead-letter) set.             |
 | `☠️ Job dead-lettered — <queue>` Slack message | `SLACK_ALERT_WEBHOOK_URL` | Human-facing alert with job name/id, attempts, and the final error. |
 
 Suggested alerting rule: page when `increase(bullmq_dead_letter_total[15m]) > 0`
