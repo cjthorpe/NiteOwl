@@ -31,6 +31,7 @@ import { decryptToken, schema } from '@niteowl/db';
 import { Worker } from 'bullmq';
 import { and, eq } from 'drizzle-orm';
 
+import { attachDeadLetterHandler } from '../lib/dead-letter.js';
 import { runLinearCatchup } from '../lib/linear-catchup.js';
 import { ingestionErrorsTotal, reportIngestionRun, timeSpan } from '../lib/metrics.js';
 
@@ -333,6 +334,9 @@ export function createOvernightCatchupWorker(
   worker.on('completed', (job) => {
     console.info(`[overnight-catchup] job ${job.id ?? ''} completed`);
   });
+
+  // Dead-letter alerting (FUL-131): fires once, only when a job exhausts retries.
+  attachDeadLetterHandler(worker, OVERNIGHT_CATCHUP_QUEUE);
 
   return worker;
 }

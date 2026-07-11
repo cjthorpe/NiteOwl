@@ -3,10 +3,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import {
+  formatDeadLetterAlert,
   formatPrMergeAlert,
   formatSilentIngestionAlert,
   sendSlackAlert,
   SlackAlertError,
+  type DeadLetterAlertData,
   type PrMergeAlertData,
   type SilentIngestionAlertData,
 } from './slack-alert.js';
@@ -154,6 +156,52 @@ describe('formatSilentIngestionAlert', () => {
     if (context?.type === 'context') {
       expect(context.elements.some((e) => e.text.includes('trace'))).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatDeadLetterAlert (FUL-131)
+// ---------------------------------------------------------------------------
+
+describe('formatDeadLetterAlert', () => {
+  const deadLetter: DeadLetterAlertData = {
+    queue: 'normalization',
+    jobId: '42',
+    jobName: 'run',
+    attemptsMade: 5,
+    failedReason: 'insert failed: connection refused',
+    occurredAt: '2026-07-06T09:30:00Z',
+  };
+
+  it('names the queue in the header and fallback text', () => {
+    const msg = formatDeadLetterAlert(deadLetter);
+    expect(msg.text).toContain('normalization');
+    const header = msg.blocks.find((b) => b.type === 'header');
+    expect(header?.type === 'header' && header.text.text).toContain('normalization');
+  });
+
+  it('surfaces the job name, id, attempt count, and failure reason', () => {
+    const msg = formatDeadLetterAlert(deadLetter);
+    const section = msg.blocks.find((b) => b.type === 'section');
+    const text = section?.type === 'section' ? section.text.text : '';
+    expect(text).toContain('run');
+    expect(text).toContain('42');
+    expect(text).toContain('5');
+    expect(text).toContain('connection refused');
+  });
+
+  it('omits the id parenthetical when jobId is absent', () => {
+    const { jobId: _omit, ...noId } = deadLetter;
+    const msg = formatDeadLetterAlert(noId);
+    expect(msg.text).not.toContain('(42)');
+  });
+
+  it('truncates very long failure reasons to keep the block within limits', () => {
+    const msg = formatDeadLetterAlert({ ...deadLetter, failedReason: 'x'.repeat(2000) });
+    const section = msg.blocks.find((b) => b.type === 'section');
+    const text = section?.type === 'section' ? section.text.text : '';
+    expect(text).toContain('…');
+    expect(text.length).toBeLessThan(700);
   });
 });
 

@@ -41,6 +41,26 @@ export interface SilentIngestionAlertData {
   traceId?: string;
 }
 
+/**
+ * Payload for a dead-letter alert (FUL-131): a BullMQ job exhausted every
+ * configured retry attempt and was moved to the queue's failed set. These jobs
+ * previously vanished silently — this alert makes the exhaustion visible so an
+ * operator can inspect (and, if needed, re-drive) the job.
+ */
+export interface DeadLetterAlertData {
+  /** BullMQ queue the job belonged to, e.g. "normalization". */
+  queue: string;
+  /** Job id, when present (BullMQ assigns one on add). */
+  jobId?: string;
+  /** Job name, e.g. "send-pr-merge-alert". */
+  jobName: string;
+  /** Attempts made before the job was dead-lettered. */
+  attemptsMade: number;
+  /** The failing error message from the final attempt. */
+  failedReason: string;
+  occurredAt: string; // ISO 8601
+}
+
 /** Minimal Slack Block Kit message shape for an Incoming Webhook. */
 export interface SlackMessage {
   text: string;
@@ -196,6 +216,62 @@ export function formatSilentIngestionAlert(data: SilentIngestionAlertData): Slac
   };
 }
 
+/**
+ * Builds a Slack Block Kit message for a dead-lettered BullMQ job (FUL-131).
+ *
+ * Example render:
+ *   ☠️ Job dead-lettered — normalization
+ *   ─────────────────────────────────────
+ *   Job *send-pr-merge-alert* (`42`) exhausted all *5* attempts.
+ *   ```Slack webhook returned 500```
+ *   NiteOwl Alert · 6 Jul 2026
+ */
+export function formatDeadLetterAlert(data: DeadLetterAlertData): SlackMessage {
+  const ts = new Date(data.occurredAt).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const jobRef = data.jobId ? `${data.jobName} (\`${data.jobId}\`)` : data.jobName;
+  const fallbackText = `Dead-letter on ${data.queue}: job ${data.jobName}${
+    data.jobId ? ` (${data.jobId})` : ''
+  } exhausted ${data.attemptsMade} attempt(s) — ${data.failedReason}`;
+
+  return {
+    text: fallbackText,
+    blocks: [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: `☠️ Job dead-lettered — ${data.queue}`,
+          emoji: true,
+        },
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `Job *${escapeMarkdown(jobRef)}* exhausted all *${data.attemptsMade}* attempt(s) and was moved to the failed set.\n\`\`\`${escapeMarkdown(
+            truncate(data.failedReason, 500),
+          )}\`\`\``,
+        },
+      },
+      { type: 'divider' },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `NiteOwl Alert · ${ts}`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Delivery
 // ---------------------------------------------------------------------------
@@ -294,4 +370,9 @@ function escapeMarkdown(text: string): string {
     if (c === '>') return '&gt;';
     return c;
   });
+}
+
+/** Clamp long strings (e.g. stack traces) so Slack blocks stay within limits. */
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
