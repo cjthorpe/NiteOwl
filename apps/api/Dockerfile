@@ -49,8 +49,11 @@ COPY apps/api ./apps/api
 COPY packages/shared ./packages/shared
 COPY packages/types ./packages/types
 COPY packages/db ./packages/db
-RUN pnpm --filter "@niteowl/shared" build && \
-    pnpm --filter "@niteowl/types" build && \
+# Build in dependency order: @niteowl/shared imports @niteowl/types, so types
+# must be compiled first (mirrors the `development` stage above). Building shared
+# before types fails with TS2307 "Cannot find module '@niteowl/types'" (FUL-155).
+RUN pnpm --filter "@niteowl/types" build && \
+    pnpm --filter "@niteowl/shared" build && \
     pnpm --filter "@niteowl/db" build && \
     pnpm --filter "@niteowl/api" build
 
