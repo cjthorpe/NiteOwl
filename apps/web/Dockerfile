@@ -36,7 +36,13 @@ CMD ["pnpm", "--filter", "@niteowl/web", "dev"]
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm --filter @niteowl/shared build && pnpm --filter @niteowl/web build
+# types first: @niteowl/shared's tsc build resolves @niteowl/types declarations,
+# and this stage is FROM base (it does not inherit the dev stage's build). Building
+# shared before types fails with TS2307 "Cannot find module '@niteowl/types'"
+# (FUL-155) — same class as the API builder stage.
+RUN pnpm --filter "@niteowl/types" build && \
+    pnpm --filter "@niteowl/shared" build && \
+    pnpm --filter "@niteowl/web" build
 
 FROM nginx:alpine AS runner
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
