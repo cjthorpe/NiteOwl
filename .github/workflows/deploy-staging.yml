@@ -95,17 +95,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Pin the CLI: `railway up` dropped `--image` in newer releases, and the
+      # image-deploy flow now lives under `service source connect` + `redeploy`.
+      # Pin so an unattended CLI upgrade can't silently re-break this again.
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        run: npm install -g @railway/cli@5.26.1
 
       - name: Deploy API service
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up \
-            --service api \
-            --image "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ needs.build-and-push.outputs.sha-tag }}" \
-            --detach
+          if [ -z "${RAILWAY_TOKEN}" ]; then
+            echo "::error::RAILWAY_TOKEN is empty. Set it as a 'staging' environment secret (Railway project token). See docs/deploy-staging.md."
+            exit 1
+          fi
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ needs.build-and-push.outputs.sha-tag }}"
+          echo "Pointing 'api' service source at ${IMAGE}"
+          railway service source connect --image "${IMAGE}" --service api
+          echo "Redeploying 'api' from its configured source"
+          railway redeploy --service api --from-source --yes
 
       - name: Wait for API health check
         env:
@@ -136,13 +144,18 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        run: npm install -g @railway/cli@5.26.1
 
       - name: Deploy Web service
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up \
-            --service web \
-            --image "${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web:${{ needs.build-and-push.outputs.sha-tag }}" \
-            --detach
+          if [ -z "${RAILWAY_TOKEN}" ]; then
+            echo "::error::RAILWAY_TOKEN is empty. Set it as a 'staging' environment secret (Railway project token). See docs/deploy-staging.md."
+            exit 1
+          fi
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web:${{ needs.build-and-push.outputs.sha-tag }}"
+          echo "Pointing 'web' service source at ${IMAGE}"
+          railway service source connect --image "${IMAGE}" --service web
+          echo "Redeploying 'web' from its configured source"
+          railway redeploy --service web --from-source --yes
