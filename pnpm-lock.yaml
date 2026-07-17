@@ -35,8 +35,8 @@ importers:
         specifier: ^7.1.1
         version: 7.1.1(eslint@10.7.0(jiti@1.21.7))
       globals:
-        specifier: ^16.5.0
-        version: 16.5.0
+        specifier: ^17.7.0
+        version: 17.7.0
       prettier:
         specifier: ^3.9.5
         version: 3.9.5
@@ -1813,8 +1813,8 @@ packages:
     engines: {node: '>=12'}
     deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
-  globals@16.5.0:
-    resolution: {integrity: sha512-c/c15i26VrJ4IRt5Z89DnIzCGDn9EcebibhAOjw5ibqEHsE1wLUgkPn9RDmNcUKyU87GeaL633nyJ+pplFR2ZQ==}
+  globals@17.7.0:
+    resolution: {integrity: sha512-Czmyns5dUsq4seFBR/Kdydhmo8y9kC79hiSkPn0YcGtNnYWnrgt0vjrSjx9tspoDGWm2CMarffRuLjM4xUz8xg==}
     engines: {node: '>=18'}
 
   globalthis@1.0.4:
@@ -4749,7 +4749,7 @@ snapshots:
       minimatch: 5.1.9
       once: 1.4.0
 
-  globals@16.5.0: {}
+  globals@17.7.0: {}
 
   globalthis@1.0.4:
     dependencies:
