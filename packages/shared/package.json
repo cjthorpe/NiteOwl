@@ -26,7 +26,7 @@
     "@niteowl/types": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.1.1",
     "typescript": "*",
     "vitest": "^4.1.10"
   }
