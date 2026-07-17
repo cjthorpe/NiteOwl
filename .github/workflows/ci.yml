@@ -7,10 +7,26 @@ on:
     branches: [main]
 
 jobs:
+  # Build-both-editions matrix: {free, commercial}, both from ONE SHA. The
+  # `free` leg is the load-bearing "free-without-ee" guard for the open-core
+  # line: it physically deletes packages/ee-* (via scripts/ci/exclude-ee.sh)
+  # BEFORE install, so the Apache-2.0 core must stand on its own. If any core
+  # package or app grows a dependency on @niteowl/ee-* — a package.json entry or
+  # a bare import — the free leg breaks at install / type-check / build. This is
+  # the mechanical proof the release runbook relies on (docs/release-process.md
+  # §4, §6.1: "do not tag unless both `CI / free` and `CI / commercial` are
+  # green"). See docs/open-core.md. Restored in FUL-157 after the free/commercial
+  # split (FUL-107 #41) was dropped during the ESLint-flat / Vitest-4 rewrites.
   ci:
-    name: Lint, Type-check, Test
+    name: ${{ matrix.edition }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    strategy:
+      # Always run both editions so we see exactly which one regressed.
+      fail-fast: false
+      matrix:
+        edition: [free, commercial]
 
     steps:
       - name: Checkout
@@ -25,8 +41,22 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Install dependencies
+      # Free-edition guard: remove commercial (ee-*) code BEFORE install so a
+      # stray core dependency on ee-* fails fast at resolution time.
+      - name: Exclude commercial (ee-*) packages — free edition guard
+        if: matrix.edition == 'free'
+        run: ./scripts/ci/exclude-ee.sh
+
+      # Commercial: lockfile must be exact. Free: the workspace was mutated
+      # above, so the committed lockfile no longer matches — re-resolve is the
+      # expected, intentional behaviour for this leg only.
+      - name: Install dependencies (commercial)
+        if: matrix.edition == 'commercial'
         run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (free)
+        if: matrix.edition == 'free'
+        run: pnpm install --no-frozen-lockfile
 
       - name: Lint
         run: pnpm lint
